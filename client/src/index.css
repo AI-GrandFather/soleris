@@ -6,6 +6,7 @@
 :root, [data-theme="dark"] {
   color-scheme: dark;
 
+  --bg-page:     #131318;
   --bg-base:     #131318;
   --bg-surface:  #18181F;
   --bg-card:     #1E1E27;
@@ -47,6 +48,7 @@
 [data-theme="light"] {
   color-scheme: light;
 
+  --bg-page:     #F3EFE6;
   --bg-base:     #F3EFE6;
   --bg-surface:  #F9F6F0;
   --bg-card:     #FFFFFF;
@@ -78,6 +80,19 @@
   --shadow-modal: 0 20px 60px rgba(0,0,0,0.18);
 
   --mesh-color: rgba(154, 104, 8, 0.04);
+}
+
+/* ─── Light background variants ─────────── */
+[data-theme="light"][data-bg="offwhite"] {
+  --bg-page: #F8F8F8;
+}
+
+[data-theme="light"][data-bg="white"] {
+  --bg-page: #FFFFFF;
+}
+
+[data-theme="light"][data-bg="cool"] {
+  --bg-page: #F0F2F5;
 }
 
 /* ─── Accent: Ocean ──────────────────────── */
@@ -181,7 +196,7 @@ html {
 }
 
 body {
-  background: var(--bg-base);
+  background: var(--bg-page);
   color: var(--text-primary);
   font-family: var(--font-ui);
   -webkit-font-smoothing: antialiased;
