@@ -63,21 +63,20 @@ function DarkTooltip({ active, payload, label, fmt }) {
   );
 }
 
-function DonutChart({ categories, convert, fmt }) {
+function DonutChart({ categories, fmtFixed }) {
   const data = categories.map(c => ({
     name: c.name,
-    value: convert(c.budget_usd),
-    valueRaw: c.budget_usd,
+    value: c.budget_pkr ?? 0,
     color: c.color,
   }));
 
-  const totalBudget = categories.reduce((s, c) => s + c.budget_usd, 0);
+  const totalBudget = categories.reduce((s, c) => s + (c.budget_pkr ?? 0), 0);
 
   const CustomLabel = ({ cx, cy }) => (
     <>
       <text x={cx} y={cy - 8} textAnchor="middle" fill="var(--text-muted)" style={{ fontFamily: 'JetBrains Mono', fontSize: 10, letterSpacing: 2 }}>BUDGET</text>
       <text x={cx} y={cy + 14} textAnchor="middle" fill="var(--text-primary)" style={{ fontFamily: 'DM Sans', fontSize: 18, fontWeight: 600 }}>
-        {fmt(totalBudget)}
+        {fmtFixed(totalBudget, 'PKR')}
       </text>
     </>
   );
@@ -115,7 +114,7 @@ function DonutChart({ categories, convert, fmt }) {
                     <span style={{ width: 8, height: 8, borderRadius: '50%', background: d.color, display: 'inline-block' }} />
                     <span style={{ color: 'var(--text-secondary)' }}>{d.name}</span>
                   </div>
-                  <div style={{ color: 'var(--text-primary)', letterSpacing: '0.04em' }}>{fmt(d.valueRaw)}</div>
+                  <div style={{ color: 'var(--text-primary)', letterSpacing: '0.04em' }}>{fmtFixed(d.value, 'PKR')}</div>
                 </div>
               );
             }}
@@ -138,13 +137,13 @@ function DonutChart({ categories, convert, fmt }) {
   );
 }
 
-function SpentVsRemainingChart({ categories, convert, fmt }) {
+function SpentVsRemainingChart({ categories, fmtFixed }) {
   const data = categories.map(c => ({
     name: c.name.length > 10 ? c.name.slice(0, 10) + '…' : c.name,
-    spent: parseFloat(convert(c.spent_usd).toFixed(2)),
-    remaining: parseFloat(convert(Math.max(0, c.budget_usd - c.spent_usd)).toFixed(2)),
-    spentRaw: c.spent_usd,
-    remainingRaw: Math.max(0, c.budget_usd - c.spent_usd),
+    spent: parseFloat((c.spent_pkr ?? 0).toFixed(2)),
+    remaining: parseFloat(Math.max(0, (c.budget_pkr ?? 0) - (c.spent_pkr ?? 0)).toFixed(2)),
+    spentRaw: c.spent_pkr ?? 0,
+    remainingRaw: Math.max(0, (c.budget_pkr ?? 0) - (c.spent_pkr ?? 0)),
   }));
 
   const tick = { fontFamily: 'JetBrains Mono', fontSize: 10, fill: 'var(--text-secondary)', letterSpacing: 1 };
@@ -165,7 +164,7 @@ function SpentVsRemainingChart({ categories, convert, fmt }) {
                   <div style={{ color: 'var(--text-secondary)', marginBottom: 4 }}>{label}</div>
                   {payload.map((p, i) => (
                     <div key={i} style={{ color: p.fill === 'var(--gold)' ? 'var(--gold)' : 'var(--text-secondary)', marginBottom: 2 }}>
-                      {p.name}: <span style={{ color: 'var(--text-primary)' }}>{fmt(p.payload[p.name + 'Raw'])}</span>
+                      {p.name}: <span style={{ color: 'var(--text-primary)' }}>{fmtFixed(p.payload[p.name + 'Raw'], 'PKR')}</span>
                     </div>
                   ))}
                 </div>
@@ -190,9 +189,13 @@ function SpentVsRemainingChart({ categories, convert, fmt }) {
   );
 }
 
-function CumulativeLine({ dailyData, convert, fmt }) {
+function CumulativeLine({ dailyData, pkrRate, fmtFixed }) {
   const data = buildCumulativeData(dailyData, 30);
-  const converted = data.map(d => ({ ...d, cumulative: parseFloat(convert(d.cumulative).toFixed(2)) }));
+  const converted = data.map(d => ({
+    ...d,
+    cumulative: parseFloat((d.cumulative * pkrRate).toFixed(2)),
+    cumulativeRaw: d.cumulative * pkrRate,
+  }));
   const hasData = converted.some(d => d.cumulative > 0);
 
   const tick = { fontFamily: 'JetBrains Mono', fontSize: 9, fill: 'var(--text-secondary)', letterSpacing: 1 };
@@ -237,15 +240,11 @@ function CumulativeLine({ dailyData, convert, fmt }) {
             <RechartTooltip
               content={({ active, payload, label }) => {
                 if (!active || !payload?.length) return null;
-                const raw = dailyData.find(d => {
-                  const dObj = new Date(payload[0].payload.date);
-                  return d.date === payload[0].payload.date;
-                });
                 return (
                   <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-gold)', padding: '8px 12px', fontFamily: 'var(--font-mono)', fontSize: '0.7rem' }}>
                     <div style={{ color: 'var(--text-secondary)', marginBottom: 4 }}>{label}</div>
                     <div style={{ color: 'var(--gold)' }}>
-                      Cumulative: <span style={{ color: 'var(--text-primary)' }}>{fmt(payload[0].payload.cumulative / (1))}</span>
+                      Cumulative: <span style={{ color: 'var(--text-primary)' }}>{fmtFixed(payload[0].payload.cumulativeRaw, 'PKR')}</span>
                     </div>
                   </div>
                 );
@@ -271,16 +270,17 @@ function CumulativeLine({ dailyData, convert, fmt }) {
 }
 
 export default function Charts({ categories, expenses, dailyData }) {
-  const { convert, fmt } = useCurrency();
+  const { rates, fmtFixed } = useCurrency();
+  const pkrRate = rates.PKR || 278.5;
 
   return (
     <section
       className="flex flex-col gap-4"
       style={{ animation: 'fadeSlideUp 0.5s 0.3s both' }}
     >
-      <DonutChart categories={categories} convert={convert} fmt={fmt} />
-      <SpentVsRemainingChart categories={categories} convert={convert} fmt={fmt} />
-      <CumulativeLine dailyData={dailyData} convert={convert} fmt={fmt} />
+      <DonutChart categories={categories} fmtFixed={fmtFixed} />
+      <SpentVsRemainingChart categories={categories} fmtFixed={fmtFixed} />
+      <CumulativeLine dailyData={dailyData} pkrRate={pkrRate} fmtFixed={fmtFixed} />
     </section>
   );
 }

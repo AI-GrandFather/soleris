@@ -1,29 +1,24 @@
 # Soleris Ledger
 
-Business expense tracking dashboard. Dark editorial aesthetic, real-time currency conversion, SQLite persistence.
+Budget and inventory dashboard with SQLite persistence, currency conversion, and an AI assistant that can inspect and update dashboard data.
 
 ## Setup
 
 ```bash
-npm install && npm run dev
+npm install
+cp .env.example .env
+npm run dev
 ```
 
-Opens:
-- Frontend: http://localhost:5173
-- API: http://localhost:3001
+Frontend runs on the Vite dev port shown in the terminal. API runs on `http://localhost:3001`.
 
-## Features
+## Environment
 
-- Budget categories with per-category spend tracking
-- Three-currency support: USD, CNY, PKR — toggle in the nav bar
-- Real-time currency conversion (rates fetched on load, cached in SQLite)
-- Manual rate overrides via the settings drawer (gear icon)
-- Expense logging modal with any-currency input
-- Charts: allocation donut, spent vs. remaining bars, 30-day cumulative line
-- Fully offline after first rate fetch
+```bash
+OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_MODEL=gpt-5-mini-2025-08-07
+```
 
 ## Data
 
-SQLite database at `./data/budget.db`. Auto-initialised on first run with default categories and exchange rates.
-
-No API key required.
+SQLite database: `./data/budget.db`

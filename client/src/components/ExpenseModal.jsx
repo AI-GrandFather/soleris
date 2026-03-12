@@ -220,7 +220,6 @@ export default function ExpenseModal({ categories, selectedCategory, onClose, on
               value={date}
               onChange={e => setDate(e.target.value)}
               required
-              style={{ colorScheme: 'dark' }}
             />
           </div>
 

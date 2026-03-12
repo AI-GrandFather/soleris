@@ -4,24 +4,26 @@ import Navigation from './components/Navigation.jsx';
 import KPICards from './components/KPICards.jsx';
 import CategorySection from './components/CategorySection.jsx';
 import Charts from './components/Charts.jsx';
+import DashboardInsights from './components/DashboardInsights.jsx';
 import ExpenseModal from './components/ExpenseModal.jsx';
 import SettingsDrawer from './components/SettingsDrawer.jsx';
 import ProfitCalculator from './components/ProfitCalculator.jsx';
 import ChatBox from './components/ChatBox.jsx';
 
-function Dashboard({ theme, toggleTheme }) {
+function Dashboard({ theme, toggleTheme, accent, setAccent }) {
   const { setRates } = useCurrency();
 
   const [categories, setCategories]       = useState([]);
   const [expenses, setExpenses]           = useState([]);
   const [dailyData, setDailyData]         = useState([]);
-  const [masterBudgetUSD, setMasterBudget] = useState(0);
+  const [masterBudgetPKR, setMasterBudget] = useState(0);
   const [loading, setLoading]             = useState(true);
 
   const [settingsOpen, setSettingsOpen]         = useState(false);
   const [expenseModalOpen, setExpenseModalOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [view, setView] = useState('dashboard'); // 'dashboard' | 'profit'
+  const [inventoryRefreshToken, setInventoryRefreshToken] = useState(0);
 
   const fetchCategories = useCallback(async () => {
     const res = await fetch('/api/categories');
@@ -40,8 +42,8 @@ function Dashboard({ theme, toggleTheme }) {
 
   const fetchMasterBudget = useCallback(async () => {
     const res = await fetch('/api/settings/total_budget');
-    const { value_usd } = await res.json();
-    setMasterBudget(value_usd || 0);
+    const { value_pkr } = await res.json();
+    setMasterBudget(value_pkr || 0);
   }, []);
 
   const initRates = useCallback(async () => {
@@ -79,6 +81,7 @@ function Dashboard({ theme, toggleTheme }) {
     fetchExpenses();
     fetchDailyData();
     fetchMasterBudget();
+    setInventoryRefreshToken(prev => prev + 1);
   }, [fetchCategories, fetchExpenses, fetchDailyData, fetchMasterBudget]);
 
   const handleExpenseAdded = useCallback(() => {
@@ -102,6 +105,8 @@ function Dashboard({ theme, toggleTheme }) {
           onAddExpense={() => openExpenseModal()}
           theme={theme}
           onToggleTheme={toggleTheme}
+          accent={accent}
+          onAccentChange={setAccent}
         />
 
         {loading ? (
@@ -121,7 +126,7 @@ function Dashboard({ theme, toggleTheme }) {
             </div>
           </div>
         ) : (
-          <main style={{ maxWidth: 1440, margin: '0 auto', padding: '0 24px 56px' }}>
+          <main className="dashboard-main" style={{ maxWidth: 1440, margin: '0 auto' }}>
             {/* View tab bar */}
             <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border-dim)', marginTop: 8, marginBottom: 0 }}>
               {[
@@ -154,8 +159,15 @@ function Dashboard({ theme, toggleTheme }) {
               <>
                 <KPICards
                   categories={categories}
-                  masterBudgetUSD={masterBudgetUSD}
+                  masterBudgetPKR={masterBudgetPKR}
                   onUpdated={refreshAll}
+                />
+
+                <DashboardInsights
+                  categories={categories}
+                  expenses={expenses}
+                  masterBudgetPKR={masterBudgetPKR}
+                  onAddExpense={() => openExpenseModal()}
                 />
 
                 <div style={{
@@ -164,17 +176,13 @@ function Dashboard({ theme, toggleTheme }) {
                   background: 'linear-gradient(to right, var(--border-gold) 0%, var(--border-dim) 60%, transparent 100%)',
                 }} />
 
-                <div style={{
-                  display: 'grid',
-                  gap: 24,
-                  gridTemplateColumns: '1fr 1.15fr',
-                  alignItems: 'start',
-                }}>
+                <div className="dashboard-grid" style={{ alignItems: 'start' }}>
                   <CategorySection
                     categories={categories}
                     expenses={expenses}
                     onAddExpense={openExpenseModal}
                     onCategoryUpdated={refreshAll}
+                    inventoryRefreshToken={inventoryRefreshToken}
                   />
                   <Charts
                     categories={categories}
@@ -219,18 +227,31 @@ export default function App() {
     return localStorage.getItem('soleris-theme') || 'dark';
   });
 
+  const [accent, setAccentState] = useState(() => {
+    return localStorage.getItem('soleris-accent') || 'gold';
+  });
+
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('soleris-theme', theme);
   }, [theme]);
 
+  useEffect(() => {
+    document.documentElement.setAttribute('data-accent', accent);
+    localStorage.setItem('soleris-accent', accent);
+  }, [accent]);
+
   const toggleTheme = useCallback(() => {
     setTheme(t => t === 'dark' ? 'light' : 'dark');
   }, []);
 
+  const setAccent = useCallback((a) => {
+    setAccentState(a);
+  }, []);
+
   return (
     <CurrencyProvider>
-      <Dashboard theme={theme} toggleTheme={toggleTheme} />
+      <Dashboard theme={theme} toggleTheme={toggleTheme} accent={accent} setAccent={setAccent} />
     </CurrencyProvider>
   );
 }

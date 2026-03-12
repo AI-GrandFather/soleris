@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useCurrency } from '../contexts/CurrencyContext.jsx';
 
 // 10 columns — header and every row use this same template
-const GRID = 'minmax(110px,1.2fr) 60px 90px 90px 82px 82px 74px 86px 56px 96px';
+const GRID = 'minmax(110px,1.2fr) 60px 90px 90px 82px 82px 74px 86px 56px 96px 68px';
 
 function toLocalStr(usd, rate) {
   const v = usd * rate;
@@ -50,7 +50,48 @@ function GhostInput({ value, onChange, onFocus, onBlur, align = 'right', color }
 }
 
 // Each row renders 10 cells as direct grid children (Fragment)
-function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave }) {
+function SkuMoveButtons({ onMove }) {
+  const btnStyle = {
+    background: 'transparent',
+    border: '1px solid var(--border-dim)',
+    color: 'var(--text-muted)',
+    cursor: 'pointer',
+    width: 26,
+    height: 26,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  };
+
+  return (
+    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4, width: '100%' }}>
+      <button
+        onClick={() => onMove('up')}
+        style={btnStyle}
+        title="Move up"
+        onMouseEnter={e => e.currentTarget.style.color = 'var(--text-primary)'}
+        onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+      >
+        <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
+          <path d="M2 6.5L5 3.5L8 6.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
+      <button
+        onClick={() => onMove('down')}
+        style={btnStyle}
+        title="Move down"
+        onMouseEnter={e => e.currentTarget.style.color = 'var(--text-primary)'}
+        onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+      >
+        <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
+          <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
+    </div>
+  );
+}
+
+function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onMove }) {
   const [nameInput, setNameInput] = useState(sku.name);
   const [nameFocused, setNameFocused] = useState(false);
   const [nameHover,   setNameHover]   = useState(false);
@@ -72,6 +113,11 @@ function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave }) {
     if (!shipFocused.current)  setShipInput(toLocalStr(sku.shipping_cost_usd, rate));
     if (!otherFocused.current) setOtherInput(toLocalStr(sku.other_costs_usd, rate));
   }, [rate, sku.unit_price_usd, sku.selling_price_usd, sku.shipping_cost_usd, sku.other_costs_usd]);
+
+  useEffect(() => {
+    setNameInput(sku.name);
+    setQtyInput(String(sku.quantity));
+  }, [sku.name, sku.quantity]);
 
   const unitUsd     = (parseFloat(unitInput)  || 0) / rate;
   const sellingUsd  = (parseFloat(sellInput)  || 0) / rate;
@@ -241,6 +287,10 @@ function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave }) {
           {Math.abs(Math.round(totalProfitUsd * rate)).toLocaleString('en-US')}
         </span>
       </div>
+
+      <div style={{ ...cell, justifyContent: 'flex-end', paddingRight: 0 }}>
+        <SkuMoveButtons onMove={onMove} />
+      </div>
     </>
   );
 }
@@ -265,7 +315,7 @@ function CategoryHeader({ cat }) {
   );
 }
 
-const HDR_COLS = ['SKU', 'Qty', 'Unit Cost', 'Sell Price', 'Txn Fee', 'Shipping', 'Other', 'Profit/Unit', 'Margin', 'Total Profit'];
+const HDR_COLS = ['SKU', 'Qty', 'Unit Cost', 'Sell Price', 'Txn Fee', 'Shipping', 'Other', 'Profit/Unit', 'Margin', 'Total Profit', 'Move'];
 
 export default function ProfitCalculator({ categories }) {
   const { rates, currency, symbol } = useCurrency();
@@ -286,6 +336,15 @@ export default function ProfitCalculator({ categories }) {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const moveSku = useCallback(async (id, direction) => {
+    await fetch(`/api/skus/${id}/move`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ direction }),
+    });
+    load();
+  }, [load]);
 
   const catMap  = Object.fromEntries(categories.map(c => [c.id, c]));
   const grouped = skus.reduce((acc, sku) => {
@@ -448,14 +507,15 @@ export default function ProfitCalculator({ categories }) {
                     {catSkus.map(sku => (
                       <SkuProfitRow
                         key={sku.id}
-                        sku={sku}
-                        rate={rate}
-                        symbol={symbol}
-                        txnPct={txnPct}
-                        txnFixed={txnFixed}
-                        onSave={load}
-                      />
-                    ))}
+                      sku={sku}
+                      rate={rate}
+                      symbol={symbol}
+                      txnPct={txnPct}
+                      txnFixed={txnFixed}
+                      onSave={load}
+                      onMove={(direction) => moveSku(sku.id, direction)}
+                    />
+                  ))}
                   </div>
                 );
               })}

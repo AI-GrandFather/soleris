@@ -17,6 +17,7 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     budget_usd REAL NOT NULL DEFAULT 0,
+    budget_pkr REAL NOT NULL DEFAULT 0,
     color TEXT NOT NULL DEFAULT '#C9A030',
     created_at TEXT DEFAULT (datetime('now'))
   );
@@ -48,6 +49,7 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     category_id INTEGER NOT NULL,
     name TEXT NOT NULL,
+    sort_order REAL NOT NULL DEFAULT 0,
     unit_price_usd REAL NOT NULL DEFAULT 0,
     quantity REAL NOT NULL DEFAULT 1,
     selling_price_usd REAL NOT NULL DEFAULT 0,
@@ -60,21 +62,27 @@ db.exec(`
 `);
 
 // Migrate: add profit columns to skus for existing installs
-['selling_price_usd', 'shipping_cost_usd', 'other_costs_usd'].forEach(col => {
+['sort_order', 'selling_price_usd', 'shipping_cost_usd', 'other_costs_usd'].forEach(col => {
   try { db.exec(`ALTER TABLE skus ADD COLUMN ${col} REAL NOT NULL DEFAULT 0`); } catch { /* exists */ }
 });
+
+db.prepare('UPDATE skus SET sort_order = id WHERE sort_order = 0').run();
+
+try { db.exec('ALTER TABLE categories ADD COLUMN budget_pkr REAL NOT NULL DEFAULT 0'); } catch { /* exists */ }
+const pkrRate = db.prepare("SELECT rate FROM exchange_rates WHERE currency = 'PKR'").get()?.rate || 278.5;
+db.prepare('UPDATE categories SET budget_pkr = ROUND(budget_usd * ?, 2) WHERE budget_pkr = 0').run(pkrRate);
 
 // Seed default categories
 const { count: catCount } = db.prepare('SELECT COUNT(*) as count FROM categories').get();
 if (catCount === 0) {
-  const insert = db.prepare('INSERT INTO categories (name, budget_usd, color) VALUES (?, ?, ?)');
+  const insert = db.prepare('INSERT INTO categories (name, budget_usd, budget_pkr, color) VALUES (?, ?, ?, ?)');
   const seedAll = db.transaction(() => {
-    insert.run('Inventory', 0, '#C9A030');
-    insert.run('Advertising', 0, '#E8802A');
-    insert.run('PR & Marketing', 0, '#4BA36C');
-    insert.run('Operations', 0, '#4878B0');
-    insert.run('Shipping', 0, '#16A3A3');
-    insert.run('Miscellaneous', 0, '#8B5CF6');
+    insert.run('Inventory', 0, 0, '#C9A030');
+    insert.run('Advertising', 0, 0, '#E8802A');
+    insert.run('PR & Marketing', 0, 0, '#4BA36C');
+    insert.run('Operations', 0, 0, '#4878B0');
+    insert.run('Shipping', 0, 0, '#16A3A3');
+    insert.run('Miscellaneous', 0, 0, '#8B5CF6');
   });
   seedAll();
 }
@@ -85,14 +93,21 @@ db.prepare("UPDATE categories SET name = 'Advertising' WHERE name = 'Advertising
 // Migrate: add Shipping if missing from existing installs
 const hasShipping = db.prepare("SELECT id FROM categories WHERE name = 'Shipping'").get();
 if (!hasShipping) {
-  db.prepare('INSERT INTO categories (name, budget_usd, color) VALUES (?, ?, ?)').run('Shipping', 4000, '#16A3A3');
+  db.prepare('INSERT INTO categories (name, budget_usd, budget_pkr, color) VALUES (?, ?, ?, ?)').run('Shipping', 4000, 4000 * pkrRate, '#16A3A3');
 }
 
 // Seed master total budget if missing (default = sum of category budgets)
-const hasTotalBudget = db.prepare("SELECT key FROM settings WHERE key = 'total_budget_usd'").get();
-if (!hasTotalBudget) {
+const hasTotalBudgetUsd = db.prepare("SELECT key FROM settings WHERE key = 'total_budget_usd'").get();
+if (!hasTotalBudgetUsd) {
   const { total } = db.prepare('SELECT COALESCE(SUM(budget_usd), 0) as total FROM categories').get();
   db.prepare("INSERT INTO settings (key, value) VALUES ('total_budget_usd', ?)").run(String(total));
+}
+
+const hasTotalBudgetPkr = db.prepare("SELECT key FROM settings WHERE key = 'total_budget_pkr'").get();
+if (!hasTotalBudgetPkr) {
+  const usdRow = db.prepare("SELECT value FROM settings WHERE key = 'total_budget_usd'").get();
+  const usdValue = usdRow ? parseFloat(usdRow.value) : 0;
+  db.prepare("INSERT INTO settings (key, value) VALUES ('total_budget_pkr', ?)").run(String(usdValue * pkrRate));
 }
 
 // Seed default exchange rates
