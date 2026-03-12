@@ -62,11 +62,14 @@ db.exec(`
 `);
 
 // Migrate: add profit columns to skus for existing installs
-['sort_order', 'selling_price_usd', 'shipping_cost_usd', 'other_costs_usd'].forEach(col => {
+try {
+  db.exec('ALTER TABLE skus ADD COLUMN sort_order REAL NOT NULL DEFAULT 0');
+  // One-time backfill: only runs when the column is first added
+  db.prepare('UPDATE skus SET sort_order = id WHERE sort_order = 0').run();
+} catch { /* column already exists */ }
+['selling_price_usd', 'shipping_cost_usd', 'other_costs_usd'].forEach(col => {
   try { db.exec(`ALTER TABLE skus ADD COLUMN ${col} REAL NOT NULL DEFAULT 0`); } catch { /* exists */ }
 });
-
-db.prepare('UPDATE skus SET sort_order = id WHERE sort_order = 0').run();
 
 try { db.exec('ALTER TABLE categories ADD COLUMN budget_pkr REAL NOT NULL DEFAULT 0'); } catch { /* exists */ }
 const pkrRate = db.prepare("SELECT rate FROM exchange_rates WHERE currency = 'PKR'").get()?.rate || 278.5;

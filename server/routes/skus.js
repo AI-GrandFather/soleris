@@ -27,15 +27,23 @@ router.post('/', (req, res) => {
 
 // PUT /api/skus/:id
 router.put('/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+  const existing = db.prepare('SELECT * FROM skus WHERE id = ?').get(id);
+  if (!existing) return res.status(404).json({ error: 'SKU not found' });
   const { name, unit_price_usd, quantity, note, selling_price_usd, shipping_cost_usd, other_costs_usd } = req.body;
   db.prepare(
     'UPDATE skus SET name = ?, unit_price_usd = ?, quantity = ?, note = ?, selling_price_usd = ?, shipping_cost_usd = ?, other_costs_usd = ? WHERE id = ?'
   ).run(
-    name, unit_price_usd ?? 0, quantity ?? 1, note ?? '',
-    selling_price_usd ?? 0, shipping_cost_usd ?? 0, other_costs_usd ?? 0,
-    parseInt(req.params.id)
+    name ?? existing.name,
+    unit_price_usd ?? existing.unit_price_usd,
+    quantity ?? existing.quantity,
+    note ?? existing.note,
+    selling_price_usd ?? existing.selling_price_usd,
+    shipping_cost_usd ?? existing.shipping_cost_usd,
+    other_costs_usd ?? existing.other_costs_usd,
+    id
   );
-  const row = db.prepare('SELECT * FROM skus WHERE id = ?').get(parseInt(req.params.id));
+  const row = db.prepare('SELECT * FROM skus WHERE id = ?').get(id);
   res.json(row);
 });
 

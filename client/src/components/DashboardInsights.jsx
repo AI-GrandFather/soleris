@@ -191,7 +191,7 @@ export default function DashboardInsights({ categories, expenses, masterBudgetPK
           tone={overBudget.length ? 'danger' : 'positive'}
           footer={
             overBudget.length
-              ? `${overBudget.length} category${overBudget.length > 1 ? 'ies' : 'y'} above budget`
+              ? `${overBudget.length} categor${overBudget.length > 1 ? 'ies' : 'y'} above budget`
               : `Unallocated pool: ${fmtFixed(Math.max(unallocated, 0), 'PKR')}`
           }
         >

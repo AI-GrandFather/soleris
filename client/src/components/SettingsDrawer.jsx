@@ -87,9 +87,9 @@ function CrossRateRow({ cnyRate, pkrRate, pkrIsOverride, onSaveCrossRate }) {
           </button>
           <button
             onClick={() => { setEditing(false); setInput(cnyToPkr.toFixed(2)); }}
-            style={{ padding: '6px 10px', background: 'transparent', border: '1px solid var(--border-dim)', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: '0.7rem', cursor: 'pointer', borderRadius: 4, flexShrink: 0 }}
+            style={{ padding: '6px 10px', background: 'transparent', border: '1px solid var(--border-dim)', color: 'var(--text-muted)', cursor: 'pointer', borderRadius: 4, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
-            ✕
+            <svg width="9" height="9" viewBox="0 0 9 9" fill="none"><path d="M1 1l7 7M8 1L1 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
           </button>
         </div>
       ) : (
@@ -178,7 +178,7 @@ function UsdRefRow({ rec, onSave }) {
             style={{ width: 70, background: 'var(--bg-elevated)', border: '1px solid var(--border-gold-bright)', color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: '0.72rem', padding: '4px 7px', outline: 'none', borderRadius: 3 }}
           />
           <button onClick={handleSave} style={{ padding: '4px 8px', background: 'var(--gold)', border: 'none', color: '#fff', fontFamily: 'var(--font-ui)', fontWeight: 600, fontSize: '0.65rem', cursor: 'pointer', borderRadius: 3 }}>OK</button>
-          <button onClick={() => { setEditing(false); setValue(rec.rate.toFixed(4)); }} style={{ padding: '4px 6px', background: 'transparent', border: '1px solid var(--border-dim)', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: '0.65rem', cursor: 'pointer', borderRadius: 3 }}>✕</button>
+          <button onClick={() => { setEditing(false); setValue(rec.rate.toFixed(4)); }} style={{ padding: '4px 6px', background: 'transparent', border: '1px solid var(--border-dim)', color: 'var(--text-muted)', cursor: 'pointer', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><svg width="9" height="9" viewBox="0 0 9 9" fill="none"><path d="M1 1l7 7M8 1L1 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg></button>
         </div>
       ) : (
         rec.currency !== 'PKR' && (  // PKR is derived from the cross-rate; edit via cross-rate above

@@ -397,10 +397,6 @@ function executeTool(name, args) {
         return JSON.stringify({ error: 'split parts are required' });
       }
 
-      const { startSortOrder } = db.prepare(
-        'SELECT COALESCE(MAX(sort_order), 0) + 1 as startSortOrder FROM skus WHERE category_id = ?'
-      ).get(existing.category_id);
-
       const insert = db.prepare(`
         INSERT INTO skus (
           category_id, name, sort_order, unit_price_usd, quantity,
@@ -409,11 +405,16 @@ function executeTool(name, args) {
       `);
 
       const split = db.transaction(() => {
+        // Shift SKUs after the original's position to make room
+        db.prepare(
+          'UPDATE skus SET sort_order = sort_order + ? WHERE category_id = ? AND sort_order > ? AND id != ?'
+        ).run(args.parts.length - 1, existing.category_id, existing.sort_order, args.id);
+
         const created = args.parts.map((part, index) => {
           const result = insert.run(
             existing.category_id,
             part.name.trim(),
-            startSortOrder + index,
+            existing.sort_order + index,
             existing.unit_price_usd,
             part.quantity,
             existing.selling_price_usd,
