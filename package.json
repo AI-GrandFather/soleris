@@ -1,0 +1,13 @@
+{
+  "name": "soleris-ledger",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "postinstall": "cd server && npm install && cd ../client && npm install",
+    "dev": "concurrently -n \"api,app\" -c \"#C9A030,#4BA36C\" \"node server/index.js\" \"cd client && npm run dev\"",
+    "build": "cd client && npm run build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
