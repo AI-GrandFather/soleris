@@ -34,7 +34,7 @@ router.patch('/:id/sort-order', (req, res) => {
   }
   const reorder = db.transaction(() => {
     ordered_ids.forEach((skuId, index) => {
-      db.prepare('UPDATE skus SET sort_order = ? WHERE id = ?').run(index + 1, skuId);
+      db.prepare('UPDATE skus SET sort_order = ? WHERE id = ?').run(index + 1, parseInt(skuId));
     });
   });
   reorder();
