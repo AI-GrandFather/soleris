@@ -25,9 +25,9 @@ router.post('/', (req, res) => {
   res.status(201).json(row);
 });
 
-// PATCH /api/skus/:id/sort-order — reorder after drag-and-drop
+// PATCH /api/skus/reorder — reorder after drag-and-drop
 // Body: { ordered_ids: [id, id, id, ...] } (all sibling SKU ids in new order)
-router.patch('/:id/sort-order', (req, res) => {
+router.patch('/reorder', (req, res) => {
   const { ordered_ids } = req.body;
   if (!Array.isArray(ordered_ids) || ordered_ids.length === 0) {
     return res.status(400).json({ error: 'ordered_ids must be a non-empty array' });

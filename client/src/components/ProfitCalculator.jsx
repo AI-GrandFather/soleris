@@ -329,7 +329,7 @@ export default function ProfitCalculator({ categories }) {
 
   const reorderSkus = useCallback(async (orderedIds) => {
     if (orderedIds.length === 0) return;
-    await fetch(`/api/skus/${orderedIds[0]}/sort-order`, {
+    await fetch('/api/skus/reorder', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ordered_ids: orderedIds }),

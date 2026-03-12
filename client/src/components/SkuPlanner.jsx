@@ -82,14 +82,14 @@ function SkuRow({ sku, rate, symbol, onChange, onDelete, onDragStart, onDragOver
         borderBottom: '1px solid var(--border-dim)',
         cursor: 'default',
       }}
-      draggable
-      onDragStart={onDragStart}
       onDragOver={onDragOver}
       onDrop={onDrop}
       data-sku-id={sku.id}
     >
-      {/* Drag handle */}
+      {/* Drag handle — draggable is on this element only, not the row, so inputs stay usable */}
       <div
+        draggable
+        onDragStart={onDragStart}
         style={{
           cursor: 'grab',
           color: 'var(--text-muted)',
@@ -199,7 +199,7 @@ export default function SkuPlanner({ categoryId, category, onInventoryChanged, r
 
   const reorderSkus = useCallback(async (orderedIds) => {
     if (orderedIds.length === 0) return;
-    await fetch(`/api/skus/${orderedIds[0]}/sort-order`, {
+    await fetch('/api/skus/reorder', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ordered_ids: orderedIds }),
