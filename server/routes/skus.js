@@ -25,6 +25,22 @@ router.post('/', (req, res) => {
   res.status(201).json(row);
 });
 
+// PATCH /api/skus/:id/sort-order — reorder after drag-and-drop
+// Body: { ordered_ids: [id, id, id, ...] } (all sibling SKU ids in new order)
+router.patch('/:id/sort-order', (req, res) => {
+  const { ordered_ids } = req.body;
+  if (!Array.isArray(ordered_ids) || ordered_ids.length === 0) {
+    return res.status(400).json({ error: 'ordered_ids must be a non-empty array' });
+  }
+  const reorder = db.transaction(() => {
+    ordered_ids.forEach((skuId, index) => {
+      db.prepare('UPDATE skus SET sort_order = ? WHERE id = ?').run(index + 1, skuId);
+    });
+  });
+  reorder();
+  res.json({ ok: true });
+});
+
 // PUT /api/skus/:id
 router.put('/:id', (req, res) => {
   const id = parseInt(req.params.id);
