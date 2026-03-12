@@ -10,7 +10,7 @@ import SettingsDrawer from './components/SettingsDrawer.jsx';
 import ProfitCalculator from './components/ProfitCalculator.jsx';
 import ChatBox from './components/ChatBox.jsx';
 
-function Dashboard({ theme, toggleTheme, accent, setAccent }) {
+function Dashboard({ theme, toggleTheme, accent, setAccent, bg, setBg }) {
   const { setRates } = useCurrency();
 
   const [categories, setCategories]       = useState([]);
@@ -107,6 +107,8 @@ function Dashboard({ theme, toggleTheme, accent, setAccent }) {
           onToggleTheme={toggleTheme}
           accent={accent}
           onAccentChange={setAccent}
+          bg={bg}
+          onBgChange={setBg}
         />
 
         {loading ? (
@@ -249,9 +251,22 @@ export default function App() {
     setAccentState(a);
   }, []);
 
+  const [bg, setBgState] = useState(() => {
+    return localStorage.getItem('soleris-bg') || 'warm';
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-bg', bg);
+    localStorage.setItem('soleris-bg', bg);
+  }, [bg]);
+
+  const setBg = useCallback((b) => {
+    setBgState(b);
+  }, []);
+
   return (
     <CurrencyProvider>
-      <Dashboard theme={theme} toggleTheme={toggleTheme} accent={accent} setAccent={setAccent} />
+      <Dashboard theme={theme} toggleTheme={toggleTheme} accent={accent} setAccent={setAccent} bg={bg} setBg={setBg} />
     </CurrencyProvider>
   );
 }

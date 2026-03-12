@@ -9,6 +9,13 @@ const ACCENTS = [
   { id: 'slate', label: 'Slate', dark: '#6A7EC8', light: '#3A4E9A' },
 ];
 
+const BG_OPTIONS = [
+  { id: 'warm',     label: 'Warm',      color: '#F3EFE6' },
+  { id: 'offwhite', label: 'Off-White', color: '#F8F8F8' },
+  { id: 'white',    label: 'White',     color: '#FFFFFF' },
+  { id: 'cool',     label: 'Cool',      color: '#F0F2F5' },
+];
+
 function SunIcon() {
   return (
     <svg className="theme-icon" key="sun" width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -26,7 +33,7 @@ function MoonIcon() {
   );
 }
 
-function ThemePicker({ theme, onToggleTheme, accent, onAccentChange }) {
+function ThemePicker({ theme, onToggleTheme, accent, onAccentChange, bg, onBgChange }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -171,13 +178,55 @@ function ThemePicker({ theme, onToggleTheme, accent, onAccentChange }) {
               </button>
             ))}
           </div>
+
+          {theme === 'light' && (
+            <>
+              <div style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: '0.55rem',
+                letterSpacing: '0.14em',
+                color: 'var(--text-muted)',
+                textTransform: 'uppercase',
+                marginTop: 14,
+                marginBottom: 8,
+              }}>
+                Background
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {BG_OPTIONS.map(opt => {
+                  const selected = (bg || 'warm') === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      title={opt.label}
+                      onClick={() => onBgChange(opt.id)}
+                      style={{
+                        width: 26,
+                        height: 26,
+                        borderRadius: 4,
+                        background: opt.color,
+                        border: selected ? '2px solid var(--text-primary)' : '2px solid #ccc',
+                        outline: selected ? '2px solid var(--gold)' : 'none',
+                        outlineOffset: 2,
+                        cursor: 'pointer',
+                        padding: 0,
+                        flexShrink: 0,
+                        transition: 'transform 0.12s ease',
+                        transform: selected ? 'scale(1.18)' : 'scale(1)',
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-export default function Navigation({ onSettingsOpen, onAddExpense, theme, onToggleTheme, accent, onAccentChange }) {
+export default function Navigation({ onSettingsOpen, onAddExpense, theme, onToggleTheme, accent, onAccentChange, bg, onBgChange }) {
   const { currency, switchCurrency, LABELS } = useCurrency();
 
   const iconBtnStyle = {
@@ -294,6 +343,8 @@ export default function Navigation({ onSettingsOpen, onAddExpense, theme, onTogg
             onToggleTheme={onToggleTheme}
             accent={accent}
             onAccentChange={onAccentChange}
+            bg={bg}
+            onBgChange={onBgChange}
           />
 
           {/* Exchange rate settings */}
