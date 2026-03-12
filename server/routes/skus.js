@@ -14,13 +14,13 @@ router.get('/', (req, res) => {
 
 // POST /api/skus
 router.post('/', (req, res) => {
-  const { category_id, name, unit_price_usd, quantity, note } = req.body;
+  const { category_id, name, unit_price_usd, quantity, note, marketing_cost_usd } = req.body;
   const { nextSortOrder } = db.prepare(
     'SELECT COALESCE(MAX(sort_order), 0) + 1 as nextSortOrder FROM skus WHERE category_id = ?'
   ).get(category_id);
   const result = db.prepare(
-    'INSERT INTO skus (category_id, name, sort_order, unit_price_usd, quantity, note) VALUES (?, ?, ?, ?, ?, ?)'
-  ).run(category_id, name, nextSortOrder, unit_price_usd ?? 0, quantity ?? 1, note ?? '');
+    'INSERT INTO skus (category_id, name, sort_order, unit_price_usd, quantity, note, marketing_cost_usd) VALUES (?, ?, ?, ?, ?, ?, ?)'
+  ).run(category_id, name, nextSortOrder, unit_price_usd ?? 0, quantity ?? 1, note ?? '', marketing_cost_usd ?? 0);
   const row = db.prepare('SELECT * FROM skus WHERE id = ?').get(result.lastInsertRowid);
   res.status(201).json(row);
 });
@@ -30,9 +30,9 @@ router.put('/:id', (req, res) => {
   const id = parseInt(req.params.id);
   const existing = db.prepare('SELECT * FROM skus WHERE id = ?').get(id);
   if (!existing) return res.status(404).json({ error: 'SKU not found' });
-  const { name, unit_price_usd, quantity, note, selling_price_usd, shipping_cost_usd, other_costs_usd } = req.body;
+  const { name, unit_price_usd, quantity, note, selling_price_usd, shipping_cost_usd, other_costs_usd, marketing_cost_usd } = req.body;
   db.prepare(
-    'UPDATE skus SET name = ?, unit_price_usd = ?, quantity = ?, note = ?, selling_price_usd = ?, shipping_cost_usd = ?, other_costs_usd = ? WHERE id = ?'
+    'UPDATE skus SET name = ?, unit_price_usd = ?, quantity = ?, note = ?, selling_price_usd = ?, shipping_cost_usd = ?, other_costs_usd = ?, marketing_cost_usd = ? WHERE id = ?'
   ).run(
     name ?? existing.name,
     unit_price_usd ?? existing.unit_price_usd,
@@ -41,6 +41,7 @@ router.put('/:id', (req, res) => {
     selling_price_usd ?? existing.selling_price_usd,
     shipping_cost_usd ?? existing.shipping_cost_usd,
     other_costs_usd ?? existing.other_costs_usd,
+    marketing_cost_usd ?? existing.marketing_cost_usd,
     id
   );
   const row = db.prepare('SELECT * FROM skus WHERE id = ?').get(id);

@@ -71,6 +71,8 @@ try {
   try { db.exec(`ALTER TABLE skus ADD COLUMN ${col} REAL NOT NULL DEFAULT 0`); } catch { /* exists */ }
 });
 
+try { db.exec('ALTER TABLE skus ADD COLUMN marketing_cost_usd REAL NOT NULL DEFAULT 0'); } catch { /* exists */ }
+
 try { db.exec('ALTER TABLE categories ADD COLUMN budget_pkr REAL NOT NULL DEFAULT 0'); } catch { /* exists */ }
 const pkrRate = db.prepare("SELECT rate FROM exchange_rates WHERE currency = 'PKR'").get()?.rate || 278.5;
 db.prepare('UPDATE categories SET budget_pkr = ROUND(budget_usd * ?, 2) WHERE budget_pkr = 0').run(pkrRate);
