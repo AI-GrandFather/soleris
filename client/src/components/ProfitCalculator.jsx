@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useCurrency } from '../contexts/CurrencyContext.jsx';
 
 // 12 columns — header and every row use this same template
-const GRID = 'minmax(110px,1.2fr) 60px 90px 90px 82px 82px 74px 74px 86px 56px 96px 68px';
+const GRID = '20px minmax(110px,1.2fr) 60px 90px 90px 82px 82px 74px 74px 86px 56px 96px';
 
 function toLocalStr(usd, rate) {
   const v = usd * rate;
@@ -49,49 +49,8 @@ function GhostInput({ value, onChange, onFocus, onBlur, align = 'right', color }
   );
 }
 
-// Each row renders 10 cells as direct grid children (Fragment)
-function SkuMoveButtons({ onMove }) {
-  const btnStyle = {
-    background: 'transparent',
-    border: '1px solid var(--border-dim)',
-    color: 'var(--text-muted)',
-    cursor: 'pointer',
-    width: 26,
-    height: 26,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  };
 
-  return (
-    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4, width: '100%' }}>
-      <button
-        onClick={() => onMove('up')}
-        style={btnStyle}
-        title="Move up"
-        onMouseEnter={e => e.currentTarget.style.color = 'var(--text-primary)'}
-        onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
-      >
-        <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
-          <path d="M2 6.5L5 3.5L8 6.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      </button>
-      <button
-        onClick={() => onMove('down')}
-        style={btnStyle}
-        title="Move down"
-        onMouseEnter={e => e.currentTarget.style.color = 'var(--text-primary)'}
-        onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
-      >
-        <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
-          <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      </button>
-    </div>
-  );
-}
-
-function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onMove }) {
+function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onDragStart, onDragOver, onDrop }) {
   const [nameInput, setNameInput] = useState(sku.name);
   const [nameFocused, setNameFocused] = useState(false);
   const [nameHover,   setNameHover]   = useState(false);
@@ -165,8 +124,22 @@ function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onMove }) {
 
   return (
     <>
-      {/* Col 1: SKU name (editable) */}
-      <div style={{ ...cell, paddingLeft: 0 }}>
+      {/* Col 0: drag handle — draggable, fires onDragStart */}
+      <div
+        draggable
+        onDragStart={onDragStart}
+        style={{ ...cell, justifyContent: 'center', paddingLeft: 0, cursor: 'grab', color: 'var(--text-muted)', fontSize: 14, userSelect: 'none' }}
+        title="Drag to reorder"
+      >
+        ⠿
+      </div>
+
+      {/* Col 1: SKU name (editable) — drop target */}
+      <div
+        onDragOver={onDragOver}
+        onDrop={onDrop}
+        style={{ ...cell, paddingLeft: 0 }}
+      >
         <input
           type="text"
           style={{
@@ -306,10 +279,6 @@ function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onMove }) {
           {Math.abs(Math.round(totalProfitUsd * rate)).toLocaleString('en-US')}
         </span>
       </div>
-
-      <div style={{ ...cell, justifyContent: 'flex-end', paddingRight: 0 }}>
-        <SkuMoveButtons onMove={onMove} />
-      </div>
     </>
   );
 }
@@ -334,7 +303,7 @@ function CategoryHeader({ cat }) {
   );
 }
 
-const HDR_COLS = ['SKU', 'Qty', 'Unit Cost', 'Sell Price', 'Txn Fee', 'Shipping', 'Other', 'Marketing', 'Profit/Unit', 'Margin', 'Total Profit', 'Move'];
+const HDR_COLS = ['', 'SKU', 'Qty', 'Unit Cost', 'Sell Price', 'Txn Fee', 'Shipping', 'Other', 'Marketing', 'Profit/Unit', 'Margin', 'Total Profit'];
 
 export default function ProfitCalculator({ categories }) {
   const { rates, currency, symbol } = useCurrency();
@@ -356,11 +325,14 @@ export default function ProfitCalculator({ categories }) {
 
   useEffect(() => { load(); }, [load]);
 
-  const moveSku = useCallback(async (id, direction) => {
-    await fetch(`/api/skus/${id}/move`, {
-      method: 'POST',
+  const dragId = useRef(null);
+
+  const reorderSkus = useCallback(async (orderedIds) => {
+    if (orderedIds.length === 0) return;
+    await fetch(`/api/skus/${orderedIds[0]}/sort-order`, {
+      method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ direction }),
+      body: JSON.stringify({ ordered_ids: orderedIds }),
     });
     load();
   }, [load]);
@@ -526,15 +498,31 @@ export default function ProfitCalculator({ categories }) {
                     {catSkus.map(sku => (
                       <SkuProfitRow
                         key={sku.id}
-                      sku={sku}
-                      rate={rate}
-                      symbol={symbol}
-                      txnPct={txnPct}
-                      txnFixed={txnFixed}
-                      onSave={load}
-                      onMove={(direction) => moveSku(sku.id, direction)}
-                    />
-                  ))}
+                        sku={sku}
+                        rate={rate}
+                        symbol={symbol}
+                        txnPct={txnPct}
+                        txnFixed={txnFixed}
+                        onSave={load}
+                        onDragStart={() => { dragId.current = sku.id; }}
+                        onDragOver={e => { e.preventDefault(); }}
+                        onDrop={() => {
+                          if (dragId.current === null || dragId.current === sku.id) return;
+                          const dragSku = skus.find(s => s.id === dragId.current);
+                          if (!dragSku || dragSku.category_id !== sku.category_id) {
+                            dragId.current = null;
+                            return;
+                          }
+                          const siblings = catSkus.map(s => s.id);
+                          const fromIdx  = siblings.indexOf(dragId.current);
+                          const toIdx    = siblings.indexOf(sku.id);
+                          siblings.splice(fromIdx, 1);
+                          siblings.splice(toIdx, 0, dragId.current);
+                          dragId.current = null;
+                          reorderSkus(siblings);
+                        }}
+                      />
+                    ))}
                   </div>
                 );
               })}
