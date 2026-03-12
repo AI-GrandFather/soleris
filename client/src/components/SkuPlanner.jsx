@@ -8,48 +8,7 @@ function toLocalStr(usd, rate) {
 
 const mono = { fontFamily: 'var(--font-mono)', fontSize: '0.65rem', letterSpacing: '0.08em' };
 
-function MoveButtons({ onMoveUp, onMoveDown }) {
-  const btnStyle = {
-    background: 'transparent',
-    border: '1px solid var(--border-dim)',
-    color: 'var(--text-muted)',
-    cursor: 'pointer',
-    width: 26,
-    height: 26,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  };
-
-  return (
-    <div style={{ display: 'flex', gap: 4 }}>
-      <button
-        onClick={onMoveUp}
-        style={btnStyle}
-        title="Move up"
-        onMouseEnter={e => e.currentTarget.style.color = 'var(--text-primary)'}
-        onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
-      >
-        <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
-          <path d="M2 6.5L5 3.5L8 6.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      </button>
-      <button
-        onClick={onMoveDown}
-        style={btnStyle}
-        title="Move down"
-        onMouseEnter={e => e.currentTarget.style.color = 'var(--text-primary)'}
-        onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
-      >
-        <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
-          <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      </button>
-    </div>
-  );
-}
-
-function SkuRow({ sku, rate, symbol, onChange, onDelete, onMove }) {
+function SkuRow({ sku, rate, symbol, onChange, onDelete, onDragStart, onDragOver, onDrop }) {
   const [name, setName] = useState(sku.name);
   const [qty, setQty] = useState(String(sku.quantity));
 
@@ -113,14 +72,38 @@ function SkuRow({ sku, rate, symbol, onChange, onDelete, onMove }) {
   };
 
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: '1fr 80px 110px 90px 60px 28px',
-      gap: 6,
-      alignItems: 'center',
-      padding: '7px 0',
-      borderBottom: '1px solid var(--border-dim)',
-    }}>
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '20px 1fr 80px 110px 90px 28px',
+        gap: 6,
+        alignItems: 'center',
+        padding: '7px 0',
+        borderBottom: '1px solid var(--border-dim)',
+        cursor: 'default',
+      }}
+      draggable
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      data-sku-id={sku.id}
+    >
+      {/* Drag handle */}
+      <div
+        style={{
+          cursor: 'grab',
+          color: 'var(--text-muted)',
+          fontSize: '14px',
+          lineHeight: 1,
+          userSelect: 'none',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+        title="Drag to reorder"
+      >
+        ⠿
+      </div>
       <input
         style={inputStyle}
         value={name}
@@ -155,7 +138,6 @@ function SkuRow({ sku, rate, symbol, onChange, onDelete, onMove }) {
       <span style={{ ...mono, color: 'var(--text-secondary)', textAlign: 'right', fontSize: '0.7rem' }}>
         {symbol}{Math.round(totalLocal).toLocaleString('en-US')}
       </span>
-      <MoveButtons onMoveUp={() => onMove('up')} onMoveDown={() => onMove('down')} />
       <button
         onClick={onDelete}
         style={{
@@ -186,6 +168,7 @@ export default function SkuPlanner({ categoryId, category, onInventoryChanged, r
   const pkrRate = rates.PKR || 278.5;
 
   const [skus, setSkus] = useState([]);
+  const dragId = useRef(null);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/skus?category_id=${categoryId}`);
@@ -214,14 +197,15 @@ export default function SkuPlanner({ categoryId, category, onInventoryChanged, r
     syncInventory();
   };
 
-  const moveSku = async (id, direction) => {
-    await fetch(`/api/skus/${id}/move`, {
-      method: 'POST',
+  const reorderSkus = useCallback(async (orderedIds) => {
+    if (orderedIds.length === 0) return;
+    await fetch(`/api/skus/${orderedIds[0]}/sort-order`, {
+      method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ direction }),
+      body: JSON.stringify({ ordered_ids: orderedIds }),
     });
     syncInventory();
-  };
+  }, [syncInventory]);
 
   const setBudget = async () => {
     const res = await fetch(`/api/skus?category_id=${categoryId}`);
@@ -255,12 +239,12 @@ export default function SkuPlanner({ categoryId, category, onInventoryChanged, r
   return (
     <div style={{ padding: '12px 16px 14px' }}>
       {/* Column headers */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 110px 90px 60px 28px', gap: 6, marginBottom: 2 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '20px 1fr 80px 110px 90px 28px', gap: 6, marginBottom: 2 }}>
+        <span />
         <span style={colHeader}>Item</span>
         <span style={{ ...colHeader, textAlign: 'right' }}>Qty</span>
         <span style={{ ...colHeader, textAlign: 'right' }}>Unit Price</span>
         <span style={{ ...colHeader, textAlign: 'right' }}>Total</span>
-        <span style={{ ...colHeader, textAlign: 'center' }}>Move</span>
         <span />
       </div>
 
@@ -277,7 +261,18 @@ export default function SkuPlanner({ categoryId, category, onInventoryChanged, r
             symbol={symbol}
             onChange={syncInventory}
             onDelete={() => deleteSku(sku.id)}
-            onMove={(direction) => moveSku(sku.id, direction)}
+            onDragStart={() => { dragId.current = sku.id; }}
+            onDragOver={e => e.preventDefault()}
+            onDrop={() => {
+              if (dragId.current === null || dragId.current === sku.id) return;
+              const newOrder = skus.map(s => s.id);
+              const fromIdx = newOrder.indexOf(dragId.current);
+              const toIdx   = newOrder.indexOf(sku.id);
+              newOrder.splice(fromIdx, 1);
+              newOrder.splice(toIdx, 0, dragId.current);
+              dragId.current = null;
+              reorderSkus(newOrder);
+            }}
           />
         ))
       )}
