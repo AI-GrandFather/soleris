@@ -9,11 +9,12 @@ The app currently supports:
 - Budget planning across categories
 - Expense logging and expense history
 - Inventory SKU planning inside the Inventory category
-- Profit calculation across SKUs
+- Profit calculation across SKUs with marketing cost column
 - Currency display switching between USD, CNY, and PKR
 - Exchange-rate management with live refresh and manual overrides
-- Theme switching between dark and light
+- Theme switching between dark and light, with a background color picker for light mode
 - AI chat that can inspect and change dashboard data
+- Drag-and-drop SKU reordering in both the Inventory planner and Profit Calculator
 
 ## Architecture
 
@@ -26,7 +27,7 @@ Implemented UI areas:
 - `Navigation.jsx`
   - brand header
   - currency switcher
-  - theme toggle
+  - theme toggle with background color picker (light mode only: Warm Cream, Off-White, White, Cool Grey-White)
   - exchange-rate drawer trigger
   - expense modal trigger
 - `KPICards.jsx`
@@ -48,6 +49,7 @@ Implemented UI areas:
   - inventory category expansion into SKU planning
 - `SkuPlanner.jsx`
   - add, edit, delete SKU rows
+  - drag-and-drop reordering via always-visible grip handle
   - category-level inventory totals
   - set inventory total as category budget
 - `Charts.jsx`
@@ -55,9 +57,10 @@ Implemented UI areas:
   - spent vs remaining bar chart
   - cumulative spend line chart
 - `ProfitCalculator.jsx`
-  - SKU-level contribution and margin editing
+  - SKU-level contribution and margin editing including marketing cost column
+  - drag-and-drop reordering (within category; cross-category drops are rejected)
   - transaction fee inputs
-  - total revenue/cost/profit summary
+  - total revenue/cost/profit summary (includes marketing deduction)
 - `ExpenseModal.jsx`
   - expense creation with currency conversion into USD
 - `SettingsDrawer.jsx`
@@ -98,6 +101,7 @@ Implemented API routes:
 - `GET/POST/DELETE /api/expenses`
 - `GET /api/expenses/daily`
 - `GET/POST/PUT/DELETE /api/skus`
+- `PATCH /api/skus/reorder` — bulk sort_order update after drag-and-drop
 - `GET/PUT /api/settings/total_budget`
 - `GET/POST/PUT /api/rates`
 - `POST /api/rates/reset`
@@ -120,7 +124,8 @@ Current DB behavior:
 - seeds default exchange rates
 - seeds total budget from category sum
 - enables WAL mode
-- applies a small column migration for SKU profit fields
+- applies column migrations for SKU profit fields and `marketing_cost_usd`
+- `DATABASE_PATH` environment variable overrides the default `data/budget.db` path (used by tests)
 
 ## AI Chat
 
@@ -163,9 +168,11 @@ Recent chat-related fixes already implemented:
   - unit cost
   - shipping cost
   - other costs
+  - marketing cost (new)
   - transaction fee impact
   - margin
   - total profit
+  - formula: `profit = sell − unit_cost − txn_fee − shipping − other − marketing`
 - Expense modal converts selected display currency back into USD before saving
 - Budget edit modal converts current display currency back into USD before saving
 - Exchange-rate drawer supports:
@@ -181,6 +188,11 @@ Recent chat-related fixes already implemented:
 - Fixed root dev workflow so backend changes reload during development
 - Updated server dependency to a newer `better-sqlite3`
 - Added `.env`-based AI configuration support in README
+- Added marketing cost column to Profit Calculator (DB migration + API + UI)
+- Added background color picker for light mode (Warm Cream / Off-White / White / Cool Grey-White), persisted in `localStorage`
+- Replaced up/down move buttons with HTML5 drag-and-drop in SkuPlanner and ProfitCalculator
+- Added `PATCH /api/skus/reorder` endpoint with integer sort_order renumbering in a single transaction
+- Added automated test suite (`server/test/`) using Node.js built-in test runner (18 tests, no extra dependencies)
 
 ## Issues Faced And Fixes Applied
 
@@ -379,10 +391,10 @@ Fix:
    - Several components call `fetch` and assume success.
    - Category updates, SKU saves, and deletes should surface errors to the user.
 
-3. Add automated tests.
-   - Minimum useful coverage:
-   - route-level API tests for categories, expenses, skus, rates, chat config failure
-   - core calculation tests for profit math and budget math
+3. Expand automated tests (partial: SKU API and profit formula covered).
+   - Remaining gaps: categories, expenses, rates, settings routes
+   - Chat smoke test for tool registration and config failure path
+   - Run `cd server && npm test` (uses Node built-in test runner, no extra deps)
 
 4. Normalize chat tool schemas and add a small chat smoke test.
    - The recent schema issue shows this path needs one regression test.
@@ -436,11 +448,28 @@ Fix:
 ## Recommended Next Sequence
 
 1. Add request validation to all write routes.
-2. Add basic API and calculation tests.
+2. Expand test coverage to categories, expenses, rates, and chat routes.
 3. Add explicit expense edit/delete flows in the UI.
 4. Protect system categories like Inventory.
 5. Add export and audit capabilities.
 6. Lazy-load heavy dashboard modules to reduce bundle size.
+
+## Testing
+
+Run the test suite:
+
+```bash
+cd server && npm test
+```
+
+Test files live in `server/test/`:
+
+| File | What it covers |
+|---|---|
+| `skus.test.js` | `marketing_cost_usd` API (POST/PUT/GET), `PATCH /reorder`, DB schema |
+| `profit-formula.test.js` | Profit formula math including marketing deduction |
+
+Tests use Node.js built-in `node:test` and `node:assert`. No extra dependencies. Each test run uses a fresh temporary SQLite file; the production `data/budget.db` is never touched. The `DATABASE_PATH` environment variable controls which file `db.js` opens.
 
 ## Files Most Important To Understand First
 
