@@ -8,7 +8,7 @@ function toLocalStr(usd, rate) {
 
 const mono = { fontFamily: 'var(--font-mono)', fontSize: '0.65rem', letterSpacing: '0.08em' };
 
-function SkuRow({ sku, rate, symbol, onChange, onDelete, onDragStart, onDragOver, onDrop }) {
+function SkuRow({ sku, rate, symbol, onChange, onDelete, onDragStart, onDragOver, onDrop, onDragEnd }) {
   const [name, setName] = useState(sku.name);
   const [qty, setQty] = useState(String(sku.quantity));
 
@@ -90,6 +90,7 @@ function SkuRow({ sku, rate, symbol, onChange, onDelete, onDragStart, onDragOver
       <div
         draggable
         onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
         style={{
           cursor: 'grab',
           color: 'var(--text-muted)',
@@ -169,11 +170,14 @@ export default function SkuPlanner({ categoryId, category, onInventoryChanged, r
 
   const [skus, setSkus] = useState([]);
   const dragId = useRef(null);
+  const dragOverId = useRef(null);
+  const currentOrder = useRef([]);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/skus?category_id=${categoryId}`);
     const data = await res.json();
     setSkus(data);
+    currentOrder.current = data.map(s => s.id);
   }, [categoryId]);
 
   useEffect(() => { load(); }, [load, refreshToken]);
@@ -261,17 +265,37 @@ export default function SkuPlanner({ categoryId, category, onInventoryChanged, r
             symbol={symbol}
             onChange={syncInventory}
             onDelete={() => deleteSku(sku.id)}
-            onDragStart={() => { dragId.current = sku.id; }}
-            onDragOver={e => e.preventDefault()}
-            onDrop={() => {
+            onDragStart={() => { dragId.current = sku.id; dragOverId.current = null; }}
+            onDragOver={e => {
+              e.preventDefault();
               if (dragId.current === null || dragId.current === sku.id) return;
-              const newOrder = skus.map(s => s.id);
-              const fromIdx = newOrder.indexOf(dragId.current);
-              const toIdx   = newOrder.indexOf(sku.id);
-              newOrder.splice(fromIdx, 1);
-              newOrder.splice(toIdx, 0, dragId.current);
+              if (dragOverId.current === sku.id) return;
+              dragOverId.current = sku.id;
+              const ids = [...currentOrder.current];
+              const fromIdx = ids.indexOf(dragId.current);
+              const toIdx = ids.indexOf(sku.id);
+              if (fromIdx === -1 || toIdx === -1) return;
+              ids.splice(fromIdx, 1);
+              ids.splice(toIdx, 0, dragId.current);
+              currentOrder.current = ids;
+              setSkus(prev => {
+                const map = Object.fromEntries(prev.map(s => [s.id, s]));
+                return ids.map(id => map[id]).filter(Boolean);
+              });
+            }}
+            onDrop={() => {
+              if (dragId.current === null) return;
+              const ids = [...currentOrder.current];
               dragId.current = null;
-              reorderSkus(newOrder);
+              dragOverId.current = null;
+              reorderSkus(ids);
+            }}
+            onDragEnd={() => {
+              if (dragId.current !== null) {
+                dragId.current = null;
+                dragOverId.current = null;
+                load();
+              }
             }}
           />
         ))

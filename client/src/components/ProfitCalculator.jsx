@@ -50,7 +50,7 @@ function GhostInput({ value, onChange, onFocus, onBlur, align = 'right', color }
 }
 
 
-function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onDragStart, onDragOver, onDrop }) {
+function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onDragStart, onDragOver, onDrop, onDragEnd }) {
   const [nameInput, setNameInput] = useState(sku.name);
   const [nameFocused, setNameFocused] = useState(false);
   const [nameHover,   setNameHover]   = useState(false);
@@ -114,6 +114,7 @@ function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onDragStart
   };
 
   const pc = profitUsd >= 0 ? 'var(--green)' : 'var(--red)';
+  const dropProps = { onDragOver, onDrop };
 
   const cell = {
     padding: '11px 4px',
@@ -124,17 +125,20 @@ function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onDragStart
 
   return (
     <>
-      {/* Col 0: drag handle — draggable, fires onDragStart */}
+      {/* Col 0: drag handle */}
       <div
         draggable
         onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
         style={{ ...cell, justifyContent: 'center', paddingLeft: 0, cursor: 'grab', color: 'var(--text-muted)', fontSize: 14, userSelect: 'none' }}
         title="Drag to reorder"
       >
         ⠿
       </div>
 
-      {/* Col 1: SKU name (editable) — drop target */}
+      {/* Col 1: SKU name (editable) */}
       <div
         onDragOver={onDragOver}
         onDrop={onDrop}
@@ -165,7 +169,7 @@ function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onDragStart
       </div>
 
       {/* Col 2: Qty */}
-      <div style={{ ...cell, justifyContent: 'flex-end' }}>
+      <div {...dropProps} style={{ ...cell, justifyContent: 'flex-end' }}>
         <GhostInput
           value={qtyInput}
           onChange={e => setQtyInput(e.target.value)}
@@ -175,7 +179,7 @@ function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onDragStart
       </div>
 
       {/* Col 3: Unit Cost (editable) */}
-      <div style={{ ...cell, justifyContent: 'flex-end', gap: 5 }}>
+      <div {...dropProps} style={{ ...cell, justifyContent: 'flex-end', gap: 5 }}>
         <span style={{ fontFamily: 'var(--font-ui)', fontSize: '0.82rem', color: 'var(--text-muted)', flexShrink: 0 }}>{symbol}</span>
         <GhostInput
           value={unitInput}
@@ -189,7 +193,7 @@ function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onDragStart
       </div>
 
       {/* Col 4: Sell Price (editable) */}
-      <div style={{ ...cell, justifyContent: 'flex-end', gap: 5 }}>
+      <div {...dropProps} style={{ ...cell, justifyContent: 'flex-end', gap: 5 }}>
         <span style={{ fontFamily: 'var(--font-ui)', fontSize: '0.82rem', color: 'var(--gold)', flexShrink: 0 }}>{symbol}</span>
         <GhostInput
           value={sellInput}
@@ -204,7 +208,7 @@ function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onDragStart
       </div>
 
       {/* Col 5: Txn Fee (auto) */}
-      <div style={{ ...cell, justifyContent: 'flex-end', gap: 4 }}>
+      <div {...dropProps} style={{ ...cell, justifyContent: 'flex-end', gap: 4 }}>
         <span style={{ fontFamily: 'var(--font-ui)', fontSize: '0.75rem', color: 'var(--text-muted)', opacity: 0.7, flexShrink: 0 }}>{symbol}</span>
         <span style={{ fontFamily: 'var(--font-ui)', fontSize: '0.82rem', fontVariantNumeric: 'tabular-nums', color: 'var(--text-muted)' }}>
           {Math.abs(Math.round(feeUsd * rate)).toLocaleString('en-US')}
@@ -212,7 +216,7 @@ function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onDragStart
       </div>
 
       {/* Col 6: Shipping (editable) */}
-      <div style={{ ...cell, justifyContent: 'flex-end', gap: 5 }}>
+      <div {...dropProps} style={{ ...cell, justifyContent: 'flex-end', gap: 5 }}>
         <span style={{ fontFamily: 'var(--font-ui)', fontSize: '0.82rem', color: 'var(--text-muted)', flexShrink: 0 }}>{symbol}</span>
         <GhostInput
           value={shipInput}
@@ -226,7 +230,7 @@ function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onDragStart
       </div>
 
       {/* Col 7: Other (editable) */}
-      <div style={{ ...cell, justifyContent: 'flex-end', gap: 5 }}>
+      <div {...dropProps} style={{ ...cell, justifyContent: 'flex-end', gap: 5 }}>
         <span style={{ fontFamily: 'var(--font-ui)', fontSize: '0.82rem', color: 'var(--text-muted)', flexShrink: 0 }}>{symbol}</span>
         <GhostInput
           value={otherInput}
@@ -240,7 +244,7 @@ function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onDragStart
       </div>
 
       {/* Col 7b: Marketing (editable) */}
-      <div style={{ ...cell, justifyContent: 'flex-end', gap: 5 }}>
+      <div {...dropProps} style={{ ...cell, justifyContent: 'flex-end', gap: 5 }}>
         <span style={{ fontFamily: 'var(--font-ui)', fontSize: '0.82rem', color: 'var(--text-muted)', flexShrink: 0 }}>{symbol}</span>
         <GhostInput
           value={marketingInput}
@@ -254,7 +258,7 @@ function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onDragStart
       </div>
 
       {/* Col 8: Profit/unit */}
-      <div style={{ ...cell, justifyContent: 'flex-end', gap: 4 }}>
+      <div {...dropProps} style={{ ...cell, justifyContent: 'flex-end', gap: 4 }}>
         <span style={{ fontFamily: 'var(--font-ui)', fontSize: '0.75rem', fontWeight: 600, color: pc, flexShrink: 0 }}>
           {profitUsd < 0 ? '-' : ''}{symbol}
         </span>
@@ -264,14 +268,14 @@ function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onDragStart
       </div>
 
       {/* Col 9: Margin */}
-      <div style={{ ...cell, justifyContent: 'flex-end' }}>
+      <div {...dropProps} style={{ ...cell, justifyContent: 'flex-end' }}>
         <span style={{ fontFamily: 'var(--font-ui)', fontSize: '0.82rem', fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: pc }}>
           {margin.toFixed(1)}%
         </span>
       </div>
 
       {/* Col 10: Total Profit */}
-      <div style={{ ...cell, justifyContent: 'flex-end', paddingRight: 0, gap: 4 }}>
+      <div {...dropProps} style={{ ...cell, justifyContent: 'flex-end', paddingRight: 0, gap: 4 }}>
         <span style={{ fontFamily: 'var(--font-ui)', fontSize: '0.75rem', fontWeight: 700, color: pc, flexShrink: 0 }}>
           {totalProfitUsd < 0 ? '-' : ''}{symbol}
         </span>
@@ -326,6 +330,9 @@ export default function ProfitCalculator({ categories }) {
   useEffect(() => { load(); }, [load]);
 
   const dragId = useRef(null);
+  const dragOverId = useRef(null);
+  const skusRef = useRef([]);
+  useEffect(() => { skusRef.current = skus; }, [skus]);
 
   const reorderSkus = useCallback(async (orderedIds) => {
     if (orderedIds.length === 0) return;
@@ -504,22 +511,45 @@ export default function ProfitCalculator({ categories }) {
                         txnPct={txnPct}
                         txnFixed={txnFixed}
                         onSave={load}
-                        onDragStart={() => { dragId.current = sku.id; }}
-                        onDragOver={e => { e.preventDefault(); }}
+                        onDragStart={() => { dragId.current = sku.id; dragOverId.current = null; }}
+                        onDragOver={e => {
+                          e.preventDefault();
+                          if (dragId.current === null || dragId.current === sku.id) return;
+                          if (dragOverId.current === sku.id) return;
+                          const dragSku = skusRef.current.find(s => s.id === dragId.current);
+                          if (!dragSku || dragSku.category_id !== sku.category_id) return;
+                          dragOverId.current = sku.id;
+                          setSkus(prev => {
+                            const next = [...prev];
+                            const fromIdx = next.findIndex(s => s.id === dragId.current);
+                            const toIdx = next.findIndex(s => s.id === sku.id);
+                            if (fromIdx === -1 || toIdx === -1) return prev;
+                            const [item] = next.splice(fromIdx, 1);
+                            next.splice(toIdx, 0, item);
+                            return next;
+                          });
+                        }}
                         onDrop={() => {
                           if (dragId.current === null || dragId.current === sku.id) return;
-                          const dragSku = skus.find(s => s.id === dragId.current);
+                          const dragSku = skusRef.current.find(s => s.id === dragId.current);
                           if (!dragSku || dragSku.category_id !== sku.category_id) {
                             dragId.current = null;
+                            dragOverId.current = null;
                             return;
                           }
-                          const siblings = catSkus.map(s => s.id);
-                          const fromIdx  = siblings.indexOf(dragId.current);
-                          const toIdx    = siblings.indexOf(sku.id);
-                          siblings.splice(fromIdx, 1);
-                          siblings.splice(toIdx, 0, dragId.current);
+                          const siblings = skusRef.current
+                            .filter(s => s.category_id === sku.category_id)
+                            .map(s => s.id);
                           dragId.current = null;
+                          dragOverId.current = null;
                           reorderSkus(siblings);
+                        }}
+                        onDragEnd={() => {
+                          if (dragId.current !== null) {
+                            dragId.current = null;
+                            dragOverId.current = null;
+                            load();
+                          }
                         }}
                       />
                     ))}
