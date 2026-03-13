@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useCurrency } from '../contexts/CurrencyContext.jsx';
 import SkuPlanner from './SkuPlanner.jsx';
+import ExpenseModal from './ExpenseModal.jsx';
 
 const PALETTE = ['#C9A030', '#E8802A', '#4BA36C', '#4878B0', '#8B5CF6', '#C04444', '#16A3A3'];
 
-function CategoryRow({ cat, expenses, onAddExpense, onEdit, onDelete, onCategoryUpdated, inventoryRefreshToken }) {
+function CategoryRow({ cat, expenses, onAddExpense, onEdit, onDelete, onCategoryUpdated, inventoryRefreshToken, onEditExpense, onDeleteExpense }) {
   const { rates, fmtFixed } = useCurrency();
   const [expanded, setExpanded] = useState(false);
 
@@ -210,6 +211,28 @@ function CategoryRow({ cat, expenses, onAddExpense, onEdit, onDelete, onCategory
                     }}>
                       {fmtFixed(exp.amount_usd * pkrRate, 'PKR')}
                     </span>
+                    <button
+                      onClick={() => onEditExpense(exp)}
+                      title="Edit"
+                      style={{ background: 'transparent', border: '1px solid var(--border-dim)', color: 'var(--text-muted)', width: 22, height: 22, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                      onMouseEnter={e => e.currentTarget.style.color = 'var(--text-secondary)'}
+                      onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+                    >
+                      <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
+                        <path d="M7 1L9 3L3 9H1V7L7 1Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => onDeleteExpense(exp.id)}
+                      title="Delete"
+                      style={{ background: 'transparent', border: '1px solid var(--border-dim)', color: 'var(--text-muted)', width: 22, height: 22, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                      onMouseEnter={e => e.currentTarget.style.color = 'var(--red)'}
+                      onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
+                    >
+                      <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
+                        <path d="M2 2L8 8M8 2L2 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                      </svg>
+                    </button>
                   </div>
                 ))
               )}
@@ -277,6 +300,7 @@ function EditCategoryModal({ cat, onSave, onClose }) {
 export default function CategorySection({ categories, expenses, onAddExpense, onCategoryUpdated, inventoryRefreshToken }) {
   const [editTarget,    setEditTarget]    = useState(null);
   const [showNewModal,  setShowNewModal]  = useState(false);
+  const [editingExpense, setEditingExpense] = useState(null);
 
   const handleSave = async (data) => {
     if (editTarget?.id) {
@@ -300,6 +324,12 @@ export default function CategorySection({ categories, expenses, onAddExpense, on
   const handleDelete = async (id) => {
     if (!confirm('Delete this category and all its expenses?')) return;
     await fetch(`/api/categories/${id}`, { method: 'DELETE' });
+    onCategoryUpdated();
+  };
+
+  const handleDeleteExpense = async (id) => {
+    if (!confirm('Delete this expense?')) return;
+    await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
     onCategoryUpdated();
   };
 
@@ -340,6 +370,8 @@ export default function CategorySection({ categories, expenses, onAddExpense, on
             onDelete={handleDelete}
             onCategoryUpdated={onCategoryUpdated}
             inventoryRefreshToken={inventoryRefreshToken}
+            onEditExpense={(exp) => setEditingExpense(exp)}
+            onDeleteExpense={handleDeleteExpense}
           />
         ))}
         {categories.length === 0 && (
@@ -362,6 +394,15 @@ export default function CategorySection({ categories, expenses, onAddExpense, on
           cat={editTarget}
           onSave={handleSave}
           onClose={() => { setShowNewModal(false); setEditTarget(null); }}
+        />
+      )}
+
+      {editingExpense && (
+        <ExpenseModal
+          categories={categories}
+          expense={editingExpense}
+          onClose={() => setEditingExpense(null)}
+          onAdded={() => { setEditingExpense(null); onCategoryUpdated(); }}
         />
       )}
     </section>

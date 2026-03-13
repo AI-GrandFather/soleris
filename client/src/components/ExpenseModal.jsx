@@ -1,16 +1,17 @@
 import { useState } from 'react';
 import { useCurrency } from '../contexts/CurrencyContext.jsx';
 
-export default function ExpenseModal({ categories, selectedCategory, onClose, onAdded }) {
+export default function ExpenseModal({ categories, selectedCategory, expense, onClose, onAdded }) {
   const { rates, SYMBOLS } = useCurrency();
   const today = new Date().toISOString().slice(0, 10);
 
-  const [categoryId, setCategoryId] = useState(selectedCategory?.id || categories[0]?.id || '');
-  const [amount, setAmount]         = useState('');
+  const isEdit = Boolean(expense);
+  const [categoryId, setCategoryId] = useState(expense?.category_id || selectedCategory?.id || categories[0]?.id || '');
+  const [amount, setAmount]         = useState(isEdit ? String(expense.amount_usd) : '');
   const [inputCurrency, setInputCurrency] = useState('USD');
-  const [description, setDescription] = useState('');
-  const [date, setDate]             = useState(today);
-  const [note, setNote]             = useState('');
+  const [description, setDescription] = useState(expense?.description || '');
+  const [date, setDate]             = useState(expense?.date || today);
+  const [note, setNote]             = useState(expense?.note || '');
   const [saving, setSaving]         = useState(false);
   const [error, setError]           = useState('');
 
@@ -28,8 +29,9 @@ export default function ExpenseModal({ categories, selectedCategory, onClose, on
     const amount_usd = parseFloat(amount) / rate;
 
     try {
-      const res = await fetch('/api/expenses', {
-        method: 'POST',
+      const url = isEdit ? `/api/expenses/${expense.id}` : '/api/expenses';
+      const res = await fetch(url, {
+        method: isEdit ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           category_id: parseInt(categoryId),
@@ -78,7 +80,7 @@ export default function ExpenseModal({ categories, selectedCategory, onClose, on
               color: 'var(--text-primary)',
               lineHeight: 1,
             }}>
-              Log Expense
+              {isEdit ? 'Edit Expense' : 'Log Expense'}
             </h2>
             <p style={{
               fontFamily: 'var(--font-mono)',
@@ -255,7 +257,7 @@ export default function ExpenseModal({ categories, selectedCategory, onClose, on
               Cancel
             </button>
             <button type="submit" className="btn-primary" disabled={saving}>
-              {saving ? 'Saving…' : 'Log Expense'}
+              {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Log Expense'}
             </button>
           </div>
         </form>

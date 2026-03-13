@@ -44,6 +44,28 @@ router.post('/', (req, res) => {
   res.status(201).json(expense);
 });
 
+router.put('/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+  const existing = db.prepare('SELECT * FROM expenses WHERE id = ?').get(id);
+  if (!existing) return res.status(404).json({ error: 'Expense not found' });
+  const { category_id, amount_usd, description, date, note } = req.body;
+  db.prepare('UPDATE expenses SET category_id = ?, amount_usd = ?, description = ?, date = ?, note = ? WHERE id = ?')
+    .run(
+      category_id ?? existing.category_id,
+      amount_usd ?? existing.amount_usd,
+      description ?? existing.description,
+      date ?? existing.date,
+      note ?? existing.note,
+      id
+    );
+  const expense = db.prepare(`
+    SELECT e.*, c.name as category_name, c.color as category_color
+    FROM expenses e JOIN categories c ON c.id = e.category_id
+    WHERE e.id = ?
+  `).get(id);
+  res.json(expense);
+});
+
 router.delete('/:id', (req, res) => {
   db.prepare('DELETE FROM expenses WHERE id = ?').run(req.params.id);
   res.json({ success: true });
