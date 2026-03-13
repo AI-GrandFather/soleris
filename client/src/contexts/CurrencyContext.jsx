@@ -1,12 +1,16 @@
 import { createContext, useContext, useState, useCallback, useRef } from 'react';
 
 const CurrencyContext = createContext(null);
+const STORAGE_KEY = 'soleris-currency';
 
 const SYMBOLS = { USD: '$', CNY: '¥', PKR: '₨' };
 const LABELS  = { USD: 'USD', CNY: 'CNY', PKR: 'PKR' };
 
 export function CurrencyProvider({ children }) {
-  const [currency, setCurrency] = useState('USD');
+  const [currency, setCurrency] = useState(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved && LABELS[saved] ? saved : 'PKR';
+  });
   const [rates, setRates] = useState({ USD: 1.0, CNY: 7.24, PKR: 278.5 });
   const [switching, setSwitching] = useState(false);
   const timerRef = useRef(null);
@@ -17,6 +21,7 @@ export function CurrencyProvider({ children }) {
     clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
       setCurrency(next);
+      localStorage.setItem(STORAGE_KEY, next);
       setSwitching(false);
     }, 180);
   }, [currency]);
@@ -24,6 +29,12 @@ export function CurrencyProvider({ children }) {
   const convert = useCallback((usd) => {
     return (usd ?? 0) * (rates[currency] ?? 1);
   }, [currency, rates]);
+
+  const fmtFixed = useCallback((value, fixedCurrency) => {
+    const sym = SYMBOLS[fixedCurrency];
+    const rounded = Math.round(value ?? 0);
+    return `${sym}${rounded.toLocaleString('en-US')}`;
+  }, []);
 
   // Accepts a raw USD amount, returns formatted string in current currency
   // Always shows the full figure with commas — no abbreviations
@@ -39,6 +50,7 @@ export function CurrencyProvider({ children }) {
       currency, rates, setRates,
       switchCurrency, switching,
       convert, fmt,
+      fmtFixed,
       symbol: SYMBOLS[currency],
       SYMBOLS, LABELS,
     }}>

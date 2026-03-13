@@ -1,12 +1,17 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import categoriesRouter from './routes/categories.js';
 import expensesRouter from './routes/expenses.js';
 import ratesRouter from './routes/rates.js';
 import settingsRouter from './routes/settings.js';
 import skusRouter from './routes/skus.js';
 import chatRouter from './routes/chat.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: join(__dirname, '../.env') });
 
 const app = express();
 const PORT = process.env.PORT || 3001;

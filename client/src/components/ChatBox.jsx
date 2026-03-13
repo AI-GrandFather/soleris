@@ -38,12 +38,14 @@ export default function ChatBox({ onDataChanged }) {
       });
 
       if (!res.ok) {
-        const errText = res.status === 404
-          ? 'Chat endpoint not found — please restart the server.'
-          : `Server error ${res.status}. Check the server console.`;
+        const payload = await res.json().catch(() => ({}));
+        const errText = payload.error
+          || (res.status === 404
+            ? 'Chat endpoint not found. Restart the API server.'
+            : `Chat request failed with status ${res.status}.`);
         const errMsg = { role: 'assistant', content: errText };
         setMessages(prev => [...prev, errMsg]);
-        historyRef.current = [...historyRef.current, errMsg];
+        historyRef.current = historyRef.current.filter(msg => msg.role === 'user' || msg.role === 'assistant');
         return;
       }
 
@@ -52,7 +54,7 @@ export default function ChatBox({ onDataChanged }) {
       if (data.error) {
         const errMsg = { role: 'assistant', content: `Error: ${data.error}` };
         setMessages(prev => [...prev, errMsg]);
-        historyRef.current = [...historyRef.current, errMsg];
+        historyRef.current = historyRef.current.filter(msg => msg.role === 'user' || msg.role === 'assistant');
       } else {
         const assistantMsg = { role: 'assistant', content: data.reply };
         historyRef.current = data.messages;
@@ -60,9 +62,9 @@ export default function ChatBox({ onDataChanged }) {
         if (data.changed) onDataChanged?.();
       }
     } catch (err) {
-      const errMsg = { role: 'assistant', content: 'Cannot reach server — make sure `npm run dev` is running.' };
+      const errMsg = { role: 'assistant', content: 'Cannot reach the API server. Start or restart the backend and try again.' };
       setMessages(prev => [...prev, errMsg]);
-      historyRef.current = [...historyRef.current, errMsg];
+      historyRef.current = historyRef.current.filter(msg => msg.role === 'user' || msg.role === 'assistant');
     } finally {
       setLoading(false);
     }
@@ -80,6 +82,7 @@ export default function ChatBox({ onDataChanged }) {
       {/* Floating toggle button */}
       {!open && (
         <button
+          className="chat-toggle"
           onClick={() => setOpen(true)}
           title="Open AI assistant"
           style={{
@@ -110,7 +113,7 @@ export default function ChatBox({ onDataChanged }) {
 
       {/* Chat panel */}
       {open && (
-        <div style={{
+        <div className="chat-panel" style={{
           position: 'fixed',
           bottom: 28,
           right: 28,
@@ -213,13 +216,14 @@ export default function ChatBox({ onDataChanged }) {
                   SOLERIS AI ASSISTANT
                 </div>
                 <div style={{ ...ui, fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                  Ask me to update SKU quantities, add expenses, or query your budget data.
+                  Ask me to update budgets, categories, inventory, or expenses. If a change needs more detail, I will ask a follow-up question first.
                 </div>
                 <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {[
                     'Set Bag 1 quantity to 200',
                     'Add an advertising expense of $500',
-                    'What\'s my total inventory cost?',
+                    'Raise the operations budget to $3,000',
+                    'What should I fix first in this dashboard?',
                   ].map(hint => (
                     <button
                       key={hint}

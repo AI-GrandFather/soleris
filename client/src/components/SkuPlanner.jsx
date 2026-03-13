@@ -8,7 +8,7 @@ function toLocalStr(usd, rate) {
 
 const mono = { fontFamily: 'var(--font-mono)', fontSize: '0.65rem', letterSpacing: '0.08em' };
 
-function SkuRow({ sku, rate, symbol, onChange, onDelete }) {
+function SkuRow({ sku, rate, symbol, onChange, onDelete, onDragStart, onDragOver, onDrop }) {
   const [name, setName] = useState(sku.name);
   const [qty, setQty] = useState(String(sku.quantity));
 
@@ -24,6 +24,11 @@ function SkuRow({ sku, rate, symbol, onChange, onDelete }) {
       setPriceInput(toLocalStr(sku.unit_price_usd, rate));
     }
   }, [sku.unit_price_usd, rate]);
+
+  useEffect(() => {
+    setName(sku.name);
+    setQty(String(sku.quantity));
+  }, [sku.name, sku.quantity]);
 
   const totalLocal = (parseFloat(priceInput) || 0) * (parseFloat(qty) || 0);
 
@@ -67,14 +72,38 @@ function SkuRow({ sku, rate, symbol, onChange, onDelete }) {
   };
 
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: '1fr 80px 110px 90px 28px',
-      gap: 6,
-      alignItems: 'center',
-      padding: '7px 0',
-      borderBottom: '1px solid var(--border-dim)',
-    }}>
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '20px 1fr 80px 110px 90px 28px',
+        gap: 6,
+        alignItems: 'center',
+        padding: '7px 0',
+        borderBottom: '1px solid var(--border-dim)',
+        cursor: 'default',
+      }}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      data-sku-id={sku.id}
+    >
+      {/* Drag handle — draggable is on this element only, not the row, so inputs stay usable */}
+      <div
+        draggable
+        onDragStart={onDragStart}
+        style={{
+          cursor: 'grab',
+          color: 'var(--text-muted)',
+          fontSize: '14px',
+          lineHeight: 1,
+          userSelect: 'none',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+        title="Drag to reorder"
+      >
+        ⠿
+      </div>
       <input
         style={inputStyle}
         value={name}
@@ -133,25 +162,26 @@ function SkuRow({ sku, rate, symbol, onChange, onDelete }) {
   );
 }
 
-export default function SkuPlanner({ categoryId, category, onTotalChange }) {
+export default function SkuPlanner({ categoryId, category, onInventoryChanged, refreshToken }) {
   const { rates, currency, symbol } = useCurrency();
   const rate = rates[currency] || 1;
+  const pkrRate = rates.PKR || 278.5;
 
   const [skus, setSkus] = useState([]);
-
-  // Ref so load() always calls the latest onTotalChange without needing it as a dep
-  const onTotalChangeRef = useRef(onTotalChange);
-  useEffect(() => { onTotalChangeRef.current = onTotalChange; }, [onTotalChange]);
+  const dragId = useRef(null);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/skus?category_id=${categoryId}`);
     const data = await res.json();
     setSkus(data);
-    const totalUsd = data.reduce((s, sk) => s + sk.unit_price_usd * sk.quantity, 0);
-    onTotalChangeRef.current?.(totalUsd);
   }, [categoryId]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); }, [load, refreshToken]);
+
+  const syncInventory = useCallback(async () => {
+    await load();
+    onInventoryChanged?.();
+  }, [load, onInventoryChanged]);
 
   const addSku = async () => {
     await fetch('/api/skus', {
@@ -159,13 +189,23 @@ export default function SkuPlanner({ categoryId, category, onTotalChange }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ category_id: categoryId, name: 'New SKU', unit_price_usd: 0, quantity: 1 }),
     });
-    load();
+    syncInventory();
   };
 
   const deleteSku = async (id) => {
     await fetch(`/api/skus/${id}`, { method: 'DELETE' });
-    load();
+    syncInventory();
   };
+
+  const reorderSkus = useCallback(async (orderedIds) => {
+    if (orderedIds.length === 0) return;
+    await fetch('/api/skus/reorder', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ordered_ids: orderedIds }),
+    });
+    syncInventory();
+  }, [syncInventory]);
 
   const setBudget = async () => {
     const res = await fetch(`/api/skus?category_id=${categoryId}`);
@@ -174,9 +214,15 @@ export default function SkuPlanner({ categoryId, category, onTotalChange }) {
     await fetch(`/api/categories/${categoryId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: category.name, budget_usd: usd, color: category.color }),
+      body: JSON.stringify({
+        name: category.name,
+        budget_usd: usd,
+        budget_pkr: usd * pkrRate,
+        color: category.color,
+      }),
     });
-    onTotalChange?.(usd);
+    onInventoryChanged?.(usd);
+    load();
   };
 
   const totalLocal = skus.reduce((s, sk) => s + sk.unit_price_usd * sk.quantity, 0) * rate;
@@ -193,7 +239,8 @@ export default function SkuPlanner({ categoryId, category, onTotalChange }) {
   return (
     <div style={{ padding: '12px 16px 14px' }}>
       {/* Column headers */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 110px 90px 28px', gap: 6, marginBottom: 2 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '20px 1fr 80px 110px 90px 28px', gap: 6, marginBottom: 2 }}>
+        <span />
         <span style={colHeader}>Item</span>
         <span style={{ ...colHeader, textAlign: 'right' }}>Qty</span>
         <span style={{ ...colHeader, textAlign: 'right' }}>Unit Price</span>
@@ -212,8 +259,20 @@ export default function SkuPlanner({ categoryId, category, onTotalChange }) {
             sku={sku}
             rate={rate}
             symbol={symbol}
-            onChange={load}
+            onChange={syncInventory}
             onDelete={() => deleteSku(sku.id)}
+            onDragStart={() => { dragId.current = sku.id; }}
+            onDragOver={e => e.preventDefault()}
+            onDrop={() => {
+              if (dragId.current === null || dragId.current === sku.id) return;
+              const newOrder = skus.map(s => s.id);
+              const fromIdx = newOrder.indexOf(dragId.current);
+              const toIdx   = newOrder.indexOf(sku.id);
+              newOrder.splice(fromIdx, 1);
+              newOrder.splice(toIdx, 0, dragId.current);
+              dragId.current = null;
+              reorderSkus(newOrder);
+            }}
           />
         ))
       )}

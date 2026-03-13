@@ -4,14 +4,17 @@ import SkuPlanner from './SkuPlanner.jsx';
 
 const PALETTE = ['#C9A030', '#E8802A', '#4BA36C', '#4878B0', '#8B5CF6', '#C04444', '#16A3A3'];
 
-function CategoryRow({ cat, expenses, onAddExpense, onEdit, onDelete, onCategoryUpdated }) {
-  const { fmt } = useCurrency();
+function CategoryRow({ cat, expenses, onAddExpense, onEdit, onDelete, onCategoryUpdated, inventoryRefreshToken }) {
+  const { rates, fmtFixed } = useCurrency();
   const [expanded, setExpanded] = useState(false);
 
-  const pct  = cat.budget_usd > 0 ? Math.min((cat.spent_usd / cat.budget_usd) * 100, 100) : 0;
-  const over = cat.spent_usd > cat.budget_usd;
   const isInventory = cat.name.toLowerCase() === 'inventory';
   const catExpenses = expenses.filter(e => e.category_id === cat.id);
+  const pkrRate = rates.PKR || 278.5;
+  const spentPkr = cat.spent_pkr ?? ((cat.spent_usd ?? 0) * pkrRate);
+  const budgetPkr = cat.budget_pkr ?? ((cat.budget_usd ?? 0) * pkrRate);
+  const pct = budgetPkr > 0 ? Math.min((spentPkr / budgetPkr) * 100, 100) : 0;
+  const over = spentPkr > budgetPkr;
 
   return (
     <div
@@ -49,9 +52,9 @@ function CategoryRow({ cat, expenses, onAddExpense, onEdit, onDelete, onCategory
           color: over ? 'var(--red)' : 'var(--text-secondary)',
           letterSpacing: '0.04em',
         }}>
-          <span className="currency-val">{fmt(cat.spent_usd)}</span>
+          <span className="currency-val">{fmtFixed(spentPkr, 'PKR')}</span>
           <span style={{ color: 'var(--text-muted)', margin: '0 4px' }}>/</span>
-          <span className="currency-val">{fmt(cat.budget_usd)}</span>
+          <span className="currency-val">{fmtFixed(budgetPkr, 'PKR')}</span>
         </span>
 
         <span style={{
@@ -151,7 +154,8 @@ function CategoryRow({ cat, expenses, onAddExpense, onEdit, onDelete, onCategory
             <SkuPlanner
               categoryId={cat.id}
               category={cat}
-              onTotalChange={onCategoryUpdated}
+              onInventoryChanged={onCategoryUpdated}
+              refreshToken={inventoryRefreshToken}
             />
           ) : (
             <div style={{ maxHeight: 220, overflowY: 'auto' }}>
@@ -204,7 +208,7 @@ function CategoryRow({ cat, expenses, onAddExpense, onEdit, onDelete, onCategory
                       color: 'var(--text-primary)',
                       letterSpacing: '0.03em',
                     }}>
-                      {fmt(exp.amount_usd)}
+                      {fmtFixed(exp.amount_usd * pkrRate, 'PKR')}
                     </span>
                   </div>
                 ))
@@ -219,13 +223,13 @@ function CategoryRow({ cat, expenses, onAddExpense, onEdit, onDelete, onCategory
 
 function EditCategoryModal({ cat, onSave, onClose }) {
   const [name,   setName]   = useState(cat?.name || '');
-  const [budget, setBudget] = useState(cat?.budget_usd?.toString() || '');
+  const [budget, setBudget] = useState(() => String(Math.round(cat?.budget_pkr || 0)));
   const [color,  setColor]  = useState(cat?.color || PALETTE[0]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!name.trim() || !budget) return;
-    onSave({ name: name.trim(), budget_usd: parseFloat(budget), color });
+    onSave({ name: name.trim(), budget_pkr: parseFloat(budget) || 0, color });
   };
 
   return (
@@ -242,8 +246,8 @@ function EditCategoryModal({ cat, onSave, onClose }) {
             <input className="ledger-input" value={name} onChange={e => setName(e.target.value)} placeholder="Category name" required />
           </div>
           <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: '0.65rem', letterSpacing: '0.14em', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>Budget (USD)</label>
-            <input className="ledger-input" type="number" min="0" step="0.01" value={budget} onChange={e => setBudget(e.target.value)} placeholder="0.00" required />
+            <label style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: '0.65rem', letterSpacing: '0.14em', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>Budget (PKR)</label>
+            <input className="ledger-input" type="number" min="0" step="1" value={budget} onChange={e => setBudget(e.target.value)} placeholder="0" required />
           </div>
           <div style={{ marginBottom: 24 }}>
             <label style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: '0.65rem', letterSpacing: '0.14em', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8 }}>Color</label>
@@ -270,7 +274,7 @@ function EditCategoryModal({ cat, onSave, onClose }) {
   );
 }
 
-export default function CategorySection({ categories, expenses, onAddExpense, onCategoryUpdated }) {
+export default function CategorySection({ categories, expenses, onAddExpense, onCategoryUpdated, inventoryRefreshToken }) {
   const [editTarget,    setEditTarget]    = useState(null);
   const [showNewModal,  setShowNewModal]  = useState(false);
 
@@ -335,6 +339,7 @@ export default function CategorySection({ categories, expenses, onAddExpense, on
             onEdit={(c) => { setEditTarget(c); setShowNewModal(true); }}
             onDelete={handleDelete}
             onCategoryUpdated={onCategoryUpdated}
+            inventoryRefreshToken={inventoryRefreshToken}
           />
         ))}
         {categories.length === 0 && (

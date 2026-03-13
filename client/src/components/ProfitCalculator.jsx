@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useCurrency } from '../contexts/CurrencyContext.jsx';
 
-// 10 columns — header and every row use this same template
-const GRID = 'minmax(110px,1.2fr) 60px 90px 90px 82px 82px 74px 86px 56px 96px';
+// 12 columns — header and every row use this same template
+const GRID = '20px minmax(110px,1.2fr) 60px 90px 90px 82px 82px 74px 74px 86px 56px 96px';
 
 function toLocalStr(usd, rate) {
   const v = usd * rate;
@@ -49,8 +49,8 @@ function GhostInput({ value, onChange, onFocus, onBlur, align = 'right', color }
   );
 }
 
-// Each row renders 10 cells as direct grid children (Fragment)
-function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave }) {
+
+function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onDragStart, onDragOver, onDrop }) {
   const [nameInput, setNameInput] = useState(sku.name);
   const [nameFocused, setNameFocused] = useState(false);
   const [nameHover,   setNameHover]   = useState(false);
@@ -60,27 +60,36 @@ function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave }) {
   const [shipInput, setShipInput] = useState(() => toLocalStr(sku.shipping_cost_usd, rate));
   const [qtyInput,  setQtyInput]  = useState(String(sku.quantity));
   const [otherInput,setOtherInput]= useState(() => toLocalStr(sku.other_costs_usd, rate));
+  const [marketingInput, setMarketingInput] = useState(() => toLocalStr(sku.marketing_cost_usd, rate));
 
-  const unitFocused  = useRef(false);
-  const sellFocused  = useRef(false);
-  const shipFocused  = useRef(false);
-  const otherFocused = useRef(false);
+  const unitFocused      = useRef(false);
+  const sellFocused      = useRef(false);
+  const shipFocused      = useRef(false);
+  const otherFocused     = useRef(false);
+  const marketingFocused = useRef(false);
 
   useEffect(() => {
-    if (!unitFocused.current)  setUnitInput(toLocalStr(sku.unit_price_usd, rate));
-    if (!sellFocused.current)  setSellInput(toLocalStr(sku.selling_price_usd, rate));
-    if (!shipFocused.current)  setShipInput(toLocalStr(sku.shipping_cost_usd, rate));
-    if (!otherFocused.current) setOtherInput(toLocalStr(sku.other_costs_usd, rate));
-  }, [rate, sku.unit_price_usd, sku.selling_price_usd, sku.shipping_cost_usd, sku.other_costs_usd]);
+    if (!unitFocused.current)      setUnitInput(toLocalStr(sku.unit_price_usd, rate));
+    if (!sellFocused.current)      setSellInput(toLocalStr(sku.selling_price_usd, rate));
+    if (!shipFocused.current)      setShipInput(toLocalStr(sku.shipping_cost_usd, rate));
+    if (!otherFocused.current)     setOtherInput(toLocalStr(sku.other_costs_usd, rate));
+    if (!marketingFocused.current) setMarketingInput(toLocalStr(sku.marketing_cost_usd, rate));
+  }, [rate, sku.unit_price_usd, sku.selling_price_usd, sku.shipping_cost_usd, sku.other_costs_usd, sku.marketing_cost_usd]);
 
-  const unitUsd     = (parseFloat(unitInput)  || 0) / rate;
-  const sellingUsd  = (parseFloat(sellInput)  || 0) / rate;
-  const shippingUsd = (parseFloat(shipInput)  || 0) / rate;
-  const otherUsd    = (parseFloat(otherInput) || 0) / rate;
-  const qty         = parseFloat(qtyInput) || sku.quantity;
+  useEffect(() => {
+    setNameInput(sku.name);
+    setQtyInput(String(sku.quantity));
+  }, [sku.name, sku.quantity]);
+
+  const unitUsd      = (parseFloat(unitInput)      || 0) / rate;
+  const sellingUsd   = (parseFloat(sellInput)      || 0) / rate;
+  const shippingUsd  = (parseFloat(shipInput)      || 0) / rate;
+  const otherUsd     = (parseFloat(otherInput)     || 0) / rate;
+  const marketingUsd = (parseFloat(marketingInput) || 0) / rate;
+  const qty          = parseFloat(qtyInput) || sku.quantity;
 
   const feeUsd         = sellingUsd * txnPct + txnFixed;
-  const totalCostUsd   = unitUsd + feeUsd + shippingUsd + otherUsd;
+  const totalCostUsd   = unitUsd + feeUsd + shippingUsd + otherUsd + marketingUsd;
   const profitUsd      = sellingUsd - totalCostUsd;
   const margin         = sellingUsd > 0 ? (profitUsd / sellingUsd) * 100 : 0;
   const totalProfitUsd = profitUsd * qty;
@@ -97,6 +106,7 @@ function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave }) {
         selling_price_usd: sellingUsd,
         shipping_cost_usd: shippingUsd,
         other_costs_usd: otherUsd,
+        marketing_cost_usd: marketingUsd,
         ...overrides,
       }),
     });
@@ -114,8 +124,22 @@ function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave }) {
 
   return (
     <>
-      {/* Col 1: SKU name (editable) */}
-      <div style={{ ...cell, paddingLeft: 0 }}>
+      {/* Col 0: drag handle — draggable, fires onDragStart */}
+      <div
+        draggable
+        onDragStart={onDragStart}
+        style={{ ...cell, justifyContent: 'center', paddingLeft: 0, cursor: 'grab', color: 'var(--text-muted)', fontSize: 14, userSelect: 'none' }}
+        title="Drag to reorder"
+      >
+        ⠿
+      </div>
+
+      {/* Col 1: SKU name (editable) — drop target */}
+      <div
+        onDragOver={onDragOver}
+        onDrop={onDrop}
+        style={{ ...cell, paddingLeft: 0 }}
+      >
         <input
           type="text"
           style={{
@@ -215,6 +239,20 @@ function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave }) {
         />
       </div>
 
+      {/* Col 7b: Marketing (editable) */}
+      <div style={{ ...cell, justifyContent: 'flex-end', gap: 5 }}>
+        <span style={{ fontFamily: 'var(--font-ui)', fontSize: '0.82rem', color: 'var(--text-muted)', flexShrink: 0 }}>{symbol}</span>
+        <GhostInput
+          value={marketingInput}
+          onChange={e => setMarketingInput(e.target.value)}
+          onFocus={() => { marketingFocused.current = true; }}
+          onBlur={e => {
+            marketingFocused.current = false;
+            save({ marketing_cost_usd: (parseFloat(e.target.value) || 0) / rate });
+          }}
+        />
+      </div>
+
       {/* Col 8: Profit/unit */}
       <div style={{ ...cell, justifyContent: 'flex-end', gap: 4 }}>
         <span style={{ fontFamily: 'var(--font-ui)', fontSize: '0.75rem', fontWeight: 600, color: pc, flexShrink: 0 }}>
@@ -265,7 +303,7 @@ function CategoryHeader({ cat }) {
   );
 }
 
-const HDR_COLS = ['SKU', 'Qty', 'Unit Cost', 'Sell Price', 'Txn Fee', 'Shipping', 'Other', 'Profit/Unit', 'Margin', 'Total Profit'];
+const HDR_COLS = ['', 'SKU', 'Qty', 'Unit Cost', 'Sell Price', 'Txn Fee', 'Shipping', 'Other', 'Marketing', 'Profit/Unit', 'Margin', 'Total Profit'];
 
 export default function ProfitCalculator({ categories }) {
   const { rates, currency, symbol } = useCurrency();
@@ -287,6 +325,18 @@ export default function ProfitCalculator({ categories }) {
 
   useEffect(() => { load(); }, [load]);
 
+  const dragId = useRef(null);
+
+  const reorderSkus = useCallback(async (orderedIds) => {
+    if (orderedIds.length === 0) return;
+    await fetch('/api/skus/reorder', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ordered_ids: orderedIds }),
+    });
+    load();
+  }, [load]);
+
   const catMap  = Object.fromEntries(categories.map(c => [c.id, c]));
   const grouped = skus.reduce((acc, sku) => {
     if (!acc[sku.category_id]) acc[sku.category_id] = [];
@@ -296,7 +346,7 @@ export default function ProfitCalculator({ categories }) {
 
   const totals = skus.reduce((acc, sku) => {
     const fee    = sku.selling_price_usd * txnPct + txnFixed;
-    const cost   = sku.unit_price_usd + fee + sku.shipping_cost_usd + sku.other_costs_usd;
+    const cost   = sku.unit_price_usd + fee + sku.shipping_cost_usd + sku.other_costs_usd + (sku.marketing_cost_usd || 0);
     const profit = sku.selling_price_usd - cost;
     acc.revenue += sku.selling_price_usd * sku.quantity;
     acc.cost    += cost    * sku.quantity;
@@ -454,6 +504,23 @@ export default function ProfitCalculator({ categories }) {
                         txnPct={txnPct}
                         txnFixed={txnFixed}
                         onSave={load}
+                        onDragStart={() => { dragId.current = sku.id; }}
+                        onDragOver={e => { e.preventDefault(); }}
+                        onDrop={() => {
+                          if (dragId.current === null || dragId.current === sku.id) return;
+                          const dragSku = skus.find(s => s.id === dragId.current);
+                          if (!dragSku || dragSku.category_id !== sku.category_id) {
+                            dragId.current = null;
+                            return;
+                          }
+                          const siblings = catSkus.map(s => s.id);
+                          const fromIdx  = siblings.indexOf(dragId.current);
+                          const toIdx    = siblings.indexOf(sku.id);
+                          siblings.splice(fromIdx, 1);
+                          siblings.splice(toIdx, 0, dragId.current);
+                          dragId.current = null;
+                          reorderSkus(siblings);
+                        }}
                       />
                     ))}
                   </div>

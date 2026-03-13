@@ -11,19 +11,12 @@ function fmtLocal(value, symbol) {
 
 /* ── Budget Edit Modal ─────────────────────────────────────────────── */
 
-function BudgetEditModal({ categories, masterBudgetUSD, onSave, onClose }) {
-  const { currency, rates, symbol } = useCurrency();
-  const rate = rates[currency] || 1;
+function BudgetEditModal({ categories, masterBudgetPKR, onSave, onClose }) {
+  const { fmtFixed } = useCurrency();
 
-  // All inputs stored in the SELECTED currency
-  const toLocal = (usd) => {
-    const v = (usd || 0) * rate;
-    return rate > 10 ? String(Math.round(v)) : v.toFixed(2);
-  };
-
-  const [masterInput, setMasterInput] = useState(() => toLocal(masterBudgetUSD));
+  const [masterInput, setMasterInput] = useState(() => String(Math.round(masterBudgetPKR || 0)));
   const [allocations, setAllocations] = useState(() =>
-    categories.reduce((acc, c) => ({ ...acc, [c.id]: toLocal(c.budget_usd) }), {})
+    categories.reduce((acc, c) => ({ ...acc, [c.id]: String(Math.round(c.budget_pkr || 0)) }), {})
   );
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState('');
@@ -37,15 +30,15 @@ function BudgetEditModal({ categories, masterBudgetUSD, onSave, onClose }) {
     setSaving(true);
     setError('');
     try {
-      // Save master budget (convert back to USD)
+      // Save master budget in PKR
       const r1 = await fetch('/api/settings/total_budget', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value_usd: masterVal / rate }),
+        body: JSON.stringify({ value_pkr: masterVal }),
       });
       if (!r1.ok) throw new Error('Failed to save master budget');
 
-      // Save category allocations (convert back to USD)
+      // Save category allocations in PKR
       const results = await Promise.all(
         categories.map(c =>
           fetch(`/api/categories/${c.id}`, {
@@ -53,7 +46,7 @@ function BudgetEditModal({ categories, masterBudgetUSD, onSave, onClose }) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               name: c.name,
-              budget_usd: (parseFloat(allocations[c.id]) || 0) / rate,
+              budget_pkr: parseFloat(allocations[c.id]) || 0,
               color: c.color,
             }),
           })
@@ -82,7 +75,7 @@ function BudgetEditModal({ categories, masterBudgetUSD, onSave, onClose }) {
               Edit Budget
             </h2>
             <p style={{ ...mono, color: 'var(--text-muted)', marginTop: 5 }}>
-              Values shown in {currency} — converted to USD on save
+              Fixed PKR budgets for planning categories
             </p>
           </div>
           <button onClick={onClose} className="icon-btn" style={{ width: 30, height: 30, flexShrink: 0 }}>
@@ -97,7 +90,7 @@ function BudgetEditModal({ categories, masterBudgetUSD, onSave, onClose }) {
           <div style={{ ...mono, color: 'var(--text-secondary)', marginBottom: 8 }}>Master Total Budget</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontFamily: 'var(--font-ui)', fontWeight: 600, fontSize: '1rem', color: 'var(--gold)', flexShrink: 0, minWidth: 18 }}>
-              {symbol}
+              ₨
             </span>
             <input
               className="ledger-input"
@@ -119,7 +112,7 @@ function BudgetEditModal({ categories, masterBudgetUSD, onSave, onClose }) {
           </div>
 
           {categories.map(cat => {
-            const prevLocal = parseFloat(toLocal(cat.budget_usd));
+            const prevLocal = Math.round(cat.budget_pkr || 0);
             const curVal    = parseFloat(allocations[cat.id]) || 0;
             const changed   = Math.abs(curVal - prevLocal) > 0.5;
 
@@ -131,12 +124,12 @@ function BudgetEditModal({ categories, masterBudgetUSD, onSave, onClose }) {
                     {cat.name}
                   </span>
                   <span style={{ ...mono, color: changed ? 'var(--gold)' : 'var(--text-muted)', fontSize: '0.58rem' }}>
-                    was {fmtLocal(prevLocal, symbol)}
+                    was {fmtFixed(prevLocal, 'PKR')}
                   </span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontFamily: 'var(--font-ui)', fontSize: '0.85rem', color: 'var(--text-muted)', flexShrink: 0, minWidth: 18 }}>
-                    {symbol}
+                    ₨
                   </span>
                   <input
                     className="ledger-input"
@@ -173,10 +166,10 @@ function BudgetEditModal({ categories, masterBudgetUSD, onSave, onClose }) {
             </div>
             <div className="flex justify-between items-baseline">
               <span style={{ fontFamily: 'var(--font-ui)', fontWeight: 600, fontSize: '1.05rem', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
-                {fmtLocal(totalAlloc, symbol)}
+                {fmtFixed(totalAlloc, 'PKR')}
               </span>
               <span style={{ fontFamily: 'var(--font-ui)', fontWeight: 600, fontSize: '1.05rem', color: overAlloc ? 'var(--red)' : 'var(--green)', fontVariantNumeric: 'tabular-nums' }}>
-                {fmtLocal(Math.abs(unallocated), symbol)}
+                {fmtFixed(Math.abs(unallocated), 'PKR')}
               </span>
             </div>
             {masterVal > 0 && (
@@ -220,9 +213,9 @@ function BudgetEditModal({ categories, masterBudgetUSD, onSave, onClose }) {
 
 /* ── KPI Card ──────────────────────────────────────────────────────── */
 
-function KPICard({ label, valueUSD, subLabel, accent, onEdit }) {
-  const { fmt } = useCurrency();
-  const isPercent = typeof valueUSD === 'string';
+function KPICard({ label, value, subLabel, accent, onEdit, fixedCurrency }) {
+  const { fmt, fmtFixed } = useCurrency();
+  const isPercent = typeof value === 'string';
 
   return (
     <div
@@ -296,7 +289,7 @@ function KPICard({ label, valueUSD, subLabel, accent, onEdit }) {
           fontVariantNumeric: 'tabular-nums',
         }}
       >
-        {isPercent ? valueUSD : fmt(valueUSD)}
+        {isPercent ? value : fixedCurrency ? fmtFixed(value, fixedCurrency) : fmt(value)}
       </div>
 
       <div className="rule-gold" style={{ marginBottom: 8 }} />
@@ -315,13 +308,13 @@ function KPICard({ label, valueUSD, subLabel, accent, onEdit }) {
 
 /* ── KPICards ──────────────────────────────────────────────────────── */
 
-export default function KPICards({ categories, masterBudgetUSD, onUpdated }) {
+export default function KPICards({ categories, masterBudgetPKR, onUpdated }) {
   const [editingBudget, setEditingBudget] = useState(false);
 
-  const totalSpent = categories.reduce((s, c) => s + c.spent_usd, 0);
-  const remaining  = masterBudgetUSD - totalSpent;
-  const burnRate   = masterBudgetUSD > 0
-    ? ((totalSpent / masterBudgetUSD) * 100).toFixed(1)
+  const totalSpent = categories.reduce((s, c) => s + (c.spent_pkr ?? 0), 0);
+  const remaining  = masterBudgetPKR - totalSpent;
+  const burnRate   = masterBudgetPKR > 0
+    ? ((totalSpent / masterBudgetPKR) * 100).toFixed(1)
     : '0.0';
 
   const burnColor = parseFloat(burnRate) > 80
@@ -331,43 +324,43 @@ export default function KPICards({ categories, masterBudgetUSD, onUpdated }) {
       : 'var(--green)';
 
   // How much of the master budget is allocated to categories
-  const totalAllocated = categories.reduce((s, c) => s + c.budget_usd, 0);
-  const unallocatedUSD = masterBudgetUSD - totalAllocated;
+  const totalAllocated = categories.reduce((s, c) => s + (c.budget_pkr ?? 0), 0);
+  const unallocatedPKR = masterBudgetPKR - totalAllocated;
 
-  const subLabelBudget = unallocatedUSD > 0.5
+  const subLabelBudget = unallocatedPKR > 0.5
     ? `${categories.length} categories · unallocated funds remain`
-    : unallocatedUSD < -0.5
+    : unallocatedPKR < -0.5
       ? `${categories.length} categories · over-allocated`
       : `${categories.length} categories fully allocated`;
 
   return (
     <>
-      <div
-        className="grid gap-4"
-        style={{ gridTemplateColumns: 'repeat(4, 1fr)', paddingTop: 24 }}
-      >
+      <div className="kpi-grid" style={{ paddingTop: 24 }}>
         <KPICard
           label="Total Budget"
-          valueUSD={masterBudgetUSD}
+          value={masterBudgetPKR}
           subLabel={subLabelBudget}
           accent="var(--blue)"
           onEdit={() => setEditingBudget(true)}
+          fixedCurrency="PKR"
         />
         <KPICard
           label="Total Spent"
-          valueUSD={totalSpent}
+          value={totalSpent}
           subLabel="Logged expenses to date"
           accent="var(--gold)"
+          fixedCurrency="PKR"
         />
         <KPICard
           label="Remaining"
-          valueUSD={remaining}
+          value={remaining}
           subLabel={remaining >= 0 ? 'Under budget' : 'Over budget'}
           accent={remaining >= 0 ? 'var(--green)' : 'var(--red)'}
+          fixedCurrency="PKR"
         />
         <KPICard
           label="Burn Rate"
-          valueUSD={`${burnRate}%`}
+          value={`${burnRate}%`}
           subLabel="% of total budget spent"
           accent={burnColor}
         />
@@ -376,7 +369,7 @@ export default function KPICards({ categories, masterBudgetUSD, onUpdated }) {
       {editingBudget && (
         <BudgetEditModal
           categories={categories}
-          masterBudgetUSD={masterBudgetUSD}
+          masterBudgetPKR={masterBudgetPKR}
           onSave={() => { setEditingBudget(false); onUpdated(); }}
           onClose={() => setEditingBudget(false)}
         />

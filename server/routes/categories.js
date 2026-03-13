@@ -3,7 +3,12 @@ import db from '../db.js';
 
 const router = Router();
 
+function getPkrRate() {
+  return db.prepare("SELECT rate FROM exchange_rates WHERE currency = 'PKR'").get()?.rate || 278.5;
+}
+
 router.get('/', (req, res) => {
+  const pkrRate = getPkrRate();
   const categories = db.prepare(`
     SELECT c.*,
       COALESCE(SUM(e.amount_usd), 0) +
@@ -13,26 +18,37 @@ router.get('/', (req, res) => {
     LEFT JOIN expenses e ON e.category_id = c.id
     GROUP BY c.id
     ORDER BY c.created_at ASC
-  `).all();
+  `).all().map(category => ({
+    ...category,
+    spent_pkr: category.spent_usd * pkrRate,
+  }));
   res.json(categories);
 });
 
 router.post('/', (req, res) => {
-  const { name, budget_usd, color = '#C9A030' } = req.body;
+  const { name, budget_pkr = 0, color = '#C9A030' } = req.body;
   const result = db.prepare(
-    'INSERT INTO categories (name, budget_usd, color) VALUES (?, ?, ?)'
-  ).run(name, budget_usd, color);
+    'INSERT INTO categories (name, budget_usd, budget_pkr, color) VALUES (?, ?, ?, ?)'
+  ).run(name, 0, budget_pkr, color);
   const category = db.prepare(
-    'SELECT *, 0 as spent_usd FROM categories WHERE id = ?'
+    'SELECT *, 0 as spent_usd, 0 as spent_pkr FROM categories WHERE id = ?'
   ).get(result.lastInsertRowid);
   res.status(201).json(category);
 });
 
 router.put('/:id', (req, res) => {
-  const { name, budget_usd, color } = req.body;
+  const existing = db.prepare('SELECT * FROM categories WHERE id = ?').get(req.params.id);
+  const { name, budget_usd, budget_pkr, color } = req.body;
   db.prepare(
-    'UPDATE categories SET name = ?, budget_usd = ?, color = ? WHERE id = ?'
-  ).run(name, budget_usd, color, req.params.id);
+    'UPDATE categories SET name = ?, budget_usd = ?, budget_pkr = ?, color = ? WHERE id = ?'
+  ).run(
+    name ?? existing.name,
+    budget_usd ?? existing.budget_usd,
+    budget_pkr ?? existing.budget_pkr,
+    color ?? existing.color,
+    req.params.id,
+  );
+  const pkrRate = getPkrRate();
   const category = db.prepare(`
     SELECT c.*,
       COALESCE(SUM(e.amount_usd), 0) +
@@ -43,7 +59,7 @@ router.put('/:id', (req, res) => {
     WHERE c.id = ?
     GROUP BY c.id
   `).get(req.params.id);
-  res.json(category);
+  res.json({ ...category, spent_pkr: category.spent_usd * pkrRate });
 });
 
 router.delete('/:id', (req, res) => {
