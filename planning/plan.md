@@ -445,6 +445,19 @@ Fix:
 - Several frontend save paths do not handle server failures explicitly.
 - SQLite migrations are currently ad hoc inside startup code; this is workable now but will become brittle as the schema grows.
 
+## Planned / In Progress
+
+### SKU drag animation + SKU images (in progress)
+
+- **Drag animation:** CSS transition on row position so rows visually slide during reorder rather than snapping
+- **SKU images:** Upload an image per SKU (stored as base64 in the DB or as a file path); displayed as a small thumbnail in SkuPlanner and as a leading column in ProfitCalculator
+
+Implementation notes:
+- DB: `ALTER TABLE skus ADD COLUMN image_data TEXT` (nullable base64 data URL)
+- API: `PUT /api/skus/:id` already handles arbitrary fields; add `image_data` to the update
+- SkuPlanner: image thumbnail upload cell in each row; click to open file picker
+- ProfitCalculator: leading image column (thumbnail, ~32px) before the SKU name
+
 ## Recommended Next Sequence
 
 1. Add request validation to all write routes.

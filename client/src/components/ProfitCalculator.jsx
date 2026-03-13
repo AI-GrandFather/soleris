@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useCurrency } from '../contexts/CurrencyContext.jsx';
 
-// 12 columns — header and every row use this same template
-const GRID = '20px minmax(110px,1.2fr) 60px 90px 90px 82px 82px 74px 74px 86px 56px 96px';
+// 13 columns — drag handle, image, SKU name, then data columns
+const GRID = '20px 34px minmax(110px,1.2fr) 60px 90px 90px 82px 82px 74px 74px 86px 56px 96px';
 
 function toLocalStr(usd, rate) {
   const v = usd * rate;
@@ -50,7 +50,7 @@ function GhostInput({ value, onChange, onFocus, onBlur, align = 'right', color }
 }
 
 
-function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onDragStart, onDragOver, onDrop, onDragEnd }) {
+function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onDragStart, onDragOver, onDrop, onDragEnd, isDragging }) {
   const [nameInput, setNameInput] = useState(sku.name);
   const [nameFocused, setNameFocused] = useState(false);
   const [nameHover,   setNameHover]   = useState(false);
@@ -121,6 +121,8 @@ function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onDragStart
     borderBottom: '1px solid var(--border-dim)',
     display: 'flex',
     alignItems: 'center',
+    opacity: isDragging ? 0.35 : 1,
+    transition: 'opacity 0.15s',
   };
 
   return (
@@ -138,7 +140,17 @@ function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onDragStart
         ⠿
       </div>
 
-      {/* Col 1: SKU name (editable) */}
+      {/* Col 1: image thumbnail */}
+      <div {...dropProps} style={{ ...cell, paddingLeft: 0, paddingRight: 0 }}>
+        {sku.image_data
+          ? <img src={sku.image_data} alt="" style={{ width: 30, height: 30, objectFit: 'cover', borderRadius: 3, border: '1px solid var(--border-dim)' }} />
+          : <div style={{ width: 30, height: 30, borderRadius: 3, border: '1px dashed var(--border-dim)', background: 'var(--bg-elevated)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+            </div>
+        }
+      </div>
+
+      {/* Col 2: SKU name (editable) */}
       <div
         onDragOver={onDragOver}
         onDrop={onDrop}
@@ -307,7 +319,7 @@ function CategoryHeader({ cat }) {
   );
 }
 
-const HDR_COLS = ['', 'SKU', 'Qty', 'Unit Cost', 'Sell Price', 'Txn Fee', 'Shipping', 'Other', 'Marketing', 'Profit/Unit', 'Margin', 'Total Profit'];
+const HDR_COLS = ['', '', 'SKU', 'Qty', 'Unit Cost', 'Sell Price', 'Txn Fee', 'Shipping', 'Other', 'Marketing', 'Profit/Unit', 'Margin', 'Total Profit'];
 
 export default function ProfitCalculator({ categories }) {
   const { rates, currency, symbol } = useCurrency();
@@ -329,6 +341,7 @@ export default function ProfitCalculator({ categories }) {
 
   useEffect(() => { load(); }, [load]);
 
+  const [draggingId, setDraggingId] = useState(null);
   const dragId = useRef(null);
   const dragOverId = useRef(null);
   const skusRef = useRef([]);
@@ -511,7 +524,8 @@ export default function ProfitCalculator({ categories }) {
                         txnPct={txnPct}
                         txnFixed={txnFixed}
                         onSave={load}
-                        onDragStart={() => { dragId.current = sku.id; dragOverId.current = null; }}
+                        isDragging={draggingId === sku.id}
+                        onDragStart={() => { dragId.current = sku.id; dragOverId.current = null; setDraggingId(sku.id); }}
                         onDragOver={e => {
                           e.preventDefault();
                           if (dragId.current === null || dragId.current === sku.id) return;
@@ -535,6 +549,7 @@ export default function ProfitCalculator({ categories }) {
                           if (!dragSku || dragSku.category_id !== sku.category_id) {
                             dragId.current = null;
                             dragOverId.current = null;
+                            setDraggingId(null);
                             return;
                           }
                           const siblings = skusRef.current
@@ -542,6 +557,7 @@ export default function ProfitCalculator({ categories }) {
                             .map(s => s.id);
                           dragId.current = null;
                           dragOverId.current = null;
+                          setDraggingId(null);
                           reorderSkus(siblings);
                         }}
                         onDragEnd={() => {
@@ -550,6 +566,7 @@ export default function ProfitCalculator({ categories }) {
                             dragOverId.current = null;
                             load();
                           }
+                          setDraggingId(null);
                         }}
                       />
                     ))}

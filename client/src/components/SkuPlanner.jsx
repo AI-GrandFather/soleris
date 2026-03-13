@@ -8,9 +8,10 @@ function toLocalStr(usd, rate) {
 
 const mono = { fontFamily: 'var(--font-mono)', fontSize: '0.65rem', letterSpacing: '0.08em' };
 
-function SkuRow({ sku, rate, symbol, onChange, onDelete, onDragStart, onDragOver, onDrop, onDragEnd }) {
+function SkuRow({ sku, rate, symbol, onChange, onDelete, onDragStart, onDragOver, onDrop, onDragEnd, isDragging }) {
   const [name, setName] = useState(sku.name);
   const [qty, setQty] = useState(String(sku.quantity));
+  const fileInput = useRef(null);
 
   // Source of truth: price in USD. Display derives from priceUsd * rate.
   const [priceUsd, setPriceUsd] = useState(sku.unit_price_usd);
@@ -51,6 +52,21 @@ function SkuRow({ sku, rate, symbol, onChange, onDelete, onDragStart, onDragOver
     onChange();
   }, [name, qty, priceUsd, sku, onChange]);
 
+  const uploadImage = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      await fetch(`/api/skus/${sku.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image_data: ev.target.result }),
+      });
+      onChange();
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handlePriceFocus = () => { priceFocused.current = true; };
   const handlePriceBlur = () => {
     priceFocused.current = false;
@@ -75,17 +91,44 @@ function SkuRow({ sku, rate, symbol, onChange, onDelete, onDragStart, onDragOver
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: '20px 1fr 80px 110px 90px 28px',
+        gridTemplateColumns: '34px 20px 1fr 80px 110px 90px 28px',
         gap: 6,
         alignItems: 'center',
         padding: '7px 0',
         borderBottom: '1px solid var(--border-dim)',
         cursor: 'default',
+        opacity: isDragging ? 0.35 : 1,
+        transition: 'opacity 0.15s',
       }}
       onDragOver={onDragOver}
       onDrop={onDrop}
       data-sku-id={sku.id}
     >
+      {/* Image thumbnail — click to upload */}
+      <div
+        onClick={() => fileInput.current.click()}
+        style={{
+          width: 32,
+          height: 32,
+          borderRadius: 4,
+          overflow: 'hidden',
+          cursor: 'pointer',
+          border: '1px solid var(--border-dim)',
+          background: 'var(--bg-elevated)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+        }}
+        title="Click to upload image"
+      >
+        {sku.image_data
+          ? <img src={sku.image_data} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+        }
+      </div>
+      <input type="file" accept="image/*" ref={fileInput} style={{ display: 'none' }} onChange={uploadImage} />
+
       {/* Drag handle — draggable is on this element only, not the row, so inputs stay usable */}
       <div
         draggable
@@ -169,6 +212,7 @@ export default function SkuPlanner({ categoryId, category, onInventoryChanged, r
   const pkrRate = rates.PKR || 278.5;
 
   const [skus, setSkus] = useState([]);
+  const [draggingId, setDraggingId] = useState(null);
   const dragId = useRef(null);
   const dragOverId = useRef(null);
   const currentOrder = useRef([]);
@@ -243,7 +287,8 @@ export default function SkuPlanner({ categoryId, category, onInventoryChanged, r
   return (
     <div style={{ padding: '12px 16px 14px' }}>
       {/* Column headers */}
-      <div style={{ display: 'grid', gridTemplateColumns: '20px 1fr 80px 110px 90px 28px', gap: 6, marginBottom: 2 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '34px 20px 1fr 80px 110px 90px 28px', gap: 6, marginBottom: 2 }}>
+        <span />
         <span />
         <span style={colHeader}>Item</span>
         <span style={{ ...colHeader, textAlign: 'right' }}>Qty</span>
@@ -265,7 +310,8 @@ export default function SkuPlanner({ categoryId, category, onInventoryChanged, r
             symbol={symbol}
             onChange={syncInventory}
             onDelete={() => deleteSku(sku.id)}
-            onDragStart={() => { dragId.current = sku.id; dragOverId.current = null; }}
+            isDragging={draggingId === sku.id}
+            onDragStart={() => { dragId.current = sku.id; dragOverId.current = null; setDraggingId(sku.id); }}
             onDragOver={e => {
               e.preventDefault();
               if (dragId.current === null || dragId.current === sku.id) return;
@@ -288,6 +334,7 @@ export default function SkuPlanner({ categoryId, category, onInventoryChanged, r
               const ids = [...currentOrder.current];
               dragId.current = null;
               dragOverId.current = null;
+              setDraggingId(null);
               reorderSkus(ids);
             }}
             onDragEnd={() => {
@@ -296,6 +343,7 @@ export default function SkuPlanner({ categoryId, category, onInventoryChanged, r
                 dragOverId.current = null;
                 load();
               }
+              setDraggingId(null);
             }}
           />
         ))
