@@ -8,7 +8,7 @@ function toLocalStr(usd, rate) {
 
 const mono = { fontFamily: 'var(--font-mono)', fontSize: '0.65rem', letterSpacing: '0.08em' };
 
-function SkuRow({ sku, rate, symbol, onChange, onDelete, onDragStart, onDragOver, onDrop, onDragEnd, isDragging }) {
+function SkuRow({ sku, rate, symbol, onChange, onDelete, onDragStart, onDragOver, onDrop, onDragEnd, isDragging, allSkus }) {
   const [name, setName] = useState(sku.name);
   const [qty, setQty] = useState(String(sku.quantity));
   const fileInput = useRef(null);
@@ -91,7 +91,7 @@ function SkuRow({ sku, rate, symbol, onChange, onDelete, onDragStart, onDragOver
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: '34px 20px 1fr 80px 110px 90px 28px',
+        gridTemplateColumns: '56px 20px 1fr 80px 110px 90px 28px',
         gap: 6,
         alignItems: 'center',
         padding: '7px 0',
@@ -108,8 +108,8 @@ function SkuRow({ sku, rate, symbol, onChange, onDelete, onDragStart, onDragOver
       <div
         onClick={() => fileInput.current.click()}
         style={{
-          width: 32,
-          height: 32,
+          width: 56,
+          height: 56,
           borderRadius: 4,
           overflow: 'hidden',
           cursor: 'pointer',
@@ -172,12 +172,16 @@ function SkuRow({ sku, rate, symbol, onChange, onDelete, onDragStart, onDragOver
           type="number"
           min="0"
           step="0.01"
+          list={`sku-price-${sku.id}`}
           value={priceInput}
           onChange={e => setPriceInput(e.target.value)}
           onFocus={handlePriceFocus}
           onBlur={handlePriceBlur}
           placeholder="Unit price"
         />
+        <datalist id={`sku-price-${sku.id}`}>
+          {[...new Set((allSkus || []).map(s => Math.round(s.unit_price_usd * rate)).filter(v => v > 0))].sort((a, b) => a - b).map(v => <option key={v} value={v} />)}
+        </datalist>
       </div>
       <span style={{ ...mono, color: 'var(--text-secondary)', textAlign: 'right', fontSize: '0.7rem' }}>
         {symbol}{Math.round(totalLocal).toLocaleString('en-US')}
@@ -287,7 +291,7 @@ export default function SkuPlanner({ categoryId, category, onInventoryChanged, r
   return (
     <div style={{ padding: '12px 16px 14px' }}>
       {/* Column headers */}
-      <div style={{ display: 'grid', gridTemplateColumns: '34px 20px 1fr 80px 110px 90px 28px', gap: 6, marginBottom: 2 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '56px 20px 1fr 80px 110px 90px 28px', gap: 6, marginBottom: 2 }}>
         <span />
         <span />
         <span style={colHeader}>Item</span>
@@ -310,6 +314,7 @@ export default function SkuPlanner({ categoryId, category, onInventoryChanged, r
             symbol={symbol}
             onChange={syncInventory}
             onDelete={() => deleteSku(sku.id)}
+            allSkus={skus}
             isDragging={draggingId === sku.id}
             onDragStart={() => { dragId.current = sku.id; dragOverId.current = null; setDraggingId(sku.id); }}
             onDragOver={e => {

@@ -142,14 +142,15 @@ function Dashboard({ theme, toggleTheme, accent, setAccent, bg, setBg }) {
                     background: 'transparent',
                     border: 'none',
                     borderBottom: view === tab.id ? '2px solid var(--gold)' : '2px solid transparent',
-                    color: view === tab.id ? 'var(--text-primary)' : 'var(--text-muted)',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: '0.65rem',
-                    letterSpacing: '0.12em',
-                    textTransform: 'uppercase',
-                    padding: '14px 20px 12px',
+                    color: view === tab.id ? 'var(--text-primary)' : 'var(--text-secondary)',
+                    fontFamily: 'var(--font-ui)',
+                    fontSize: '0.8rem',
+                    fontWeight: view === tab.id ? 600 : 400,
+                    letterSpacing: '0.01em',
+                    padding: '14px 22px 12px',
                     cursor: 'pointer',
                     marginBottom: -1,
+                    transition: 'color 0.15s',
                   }}
                 >
                   {tab.label}
@@ -219,7 +220,7 @@ function Dashboard({ theme, toggleTheme, accent, setAccent, bg, setBg }) {
         onRatesUpdated={(map) => setRates(map)}
       />
 
-      <ChatBox onDataChanged={refreshAll} />
+      <ChatBox onDataChanged={refreshAll} activeView={view} />
     </div>
   );
 }

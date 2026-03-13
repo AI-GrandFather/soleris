@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useCurrency } from '../contexts/CurrencyContext.jsx';
 
 export default function ExpenseModal({ categories, selectedCategory, expense, onClose, onAdded }) {
@@ -6,6 +6,16 @@ export default function ExpenseModal({ categories, selectedCategory, expense, on
   const today = new Date().toISOString().slice(0, 10);
 
   const isEdit = Boolean(expense);
+
+  const [descSuggestions, setDescSuggestions] = useState([]);
+  useEffect(() => {
+    fetch('/api/expenses')
+      .then(r => r.json())
+      .then(data => {
+        setDescSuggestions([...new Set(data.map(e => e.description).filter(Boolean))].slice(0, 40));
+      })
+      .catch(() => {});
+  }, []);
   const [categoryId, setCategoryId] = useState(expense?.category_id || selectedCategory?.id || categories[0]?.id || '');
   const [amount, setAmount]         = useState(isEdit ? String(expense.amount_usd) : '');
   const [inputCurrency, setInputCurrency] = useState('USD');
@@ -17,7 +27,7 @@ export default function ExpenseModal({ categories, selectedCategory, expense, on
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!categoryId || !amount || !description.trim()) {
+    if (!categoryId || amount === '' || !description.trim()) {
       setError('Category, amount, and description are required.');
       return;
     }
@@ -154,7 +164,7 @@ export default function ExpenseModal({ categories, selectedCategory, expense, on
               <input
                 className="ledger-input"
                 type="number"
-                min="0.01"
+                min="0"
                 step="0.01"
                 value={amount}
                 onChange={e => setAmount(e.target.value)}
@@ -206,11 +216,15 @@ export default function ExpenseModal({ categories, selectedCategory, expense, on
             <input
               className="ledger-input"
               type="text"
+              list="expense-desc-list"
               value={description}
               onChange={e => setDescription(e.target.value)}
               placeholder="What was this expense for?"
               required
             />
+            <datalist id="expense-desc-list">
+              {descSuggestions.map(d => <option key={d} value={d} />)}
+            </datalist>
           </div>
 
           {/* Date */}

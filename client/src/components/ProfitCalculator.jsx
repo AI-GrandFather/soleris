@@ -2,7 +2,9 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useCurrency } from '../contexts/CurrencyContext.jsx';
 
 // 14 columns — drag handle, image, SKU name, then data columns
-const GRID = '20px 56px minmax(110px,1.2fr) 60px 90px 90px 82px 82px 74px 74px 82px 86px 56px 96px';
+const GRID = '20px 56px minmax(120px,1.2fr) 60px 96px 96px 86px 86px 80px 80px 86px 90px 72px 104px';
+// Cell padding shared between headers and data rows so columns stay aligned
+const CELL_PX = 6;
 
 function toLocalStr(usd, rate) {
   const v = usd * rate;
@@ -24,7 +26,7 @@ const ghostInput = (align = 'right') => ({
   cursor: 'text',
 });
 
-function GhostInput({ value, onChange, onFocus, onBlur, align = 'right', color }) {
+function GhostInput({ value, onChange, onFocus, onBlur, align = 'right', color, listId }) {
   const [hover, setHover] = useState(false);
   const [focused, setFocused] = useState(false);
   const style = {
@@ -38,6 +40,7 @@ function GhostInput({ value, onChange, onFocus, onBlur, align = 'right', color }
       type="number"
       min="0"
       step="1"
+      list={listId}
       style={style}
       value={value}
       onChange={onChange}
@@ -50,7 +53,13 @@ function GhostInput({ value, onChange, onFocus, onBlur, align = 'right', color }
 }
 
 
-function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onDragStart, onDragOver, onDrop, onDragEnd, isDragging }) {
+// Returns unique sorted display values (already in local currency) for a field across all SKUs
+function useFieldSuggestions(skus, field, rate) {
+  const vals = [...new Set(skus.map(s => Math.round((s[field] || 0) * rate)).filter(v => v > 0))].sort((a, b) => a - b);
+  return vals;
+}
+
+function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onDragStart, onDragOver, onDrop, onDragEnd, isDragging, allSkus }) {
   const [nameInput, setNameInput] = useState(sku.name);
   const [nameFocused, setNameFocused] = useState(false);
   const [nameHover,   setNameHover]   = useState(false);
@@ -69,6 +78,14 @@ function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onDragStart
   const otherFocused     = useRef(false);
   const marketingFocused = useRef(false);
   const packagingFocused = useRef(false);
+
+  const unitSuggestions     = useFieldSuggestions(allSkus, 'unit_price_usd', rate);
+  const sellSuggestions     = useFieldSuggestions(allSkus, 'selling_price_usd', rate);
+  const shipSuggestions     = useFieldSuggestions(allSkus, 'shipping_cost_usd', rate);
+  const otherSuggestions    = useFieldSuggestions(allSkus, 'other_costs_usd', rate);
+  const mktSuggestions      = useFieldSuggestions(allSkus, 'marketing_cost_usd', rate);
+  const pkgSuggestions      = useFieldSuggestions(allSkus, 'packaging_cost_usd', rate);
+  const listPrefix = `sku-${sku.id}`;
 
   useEffect(() => {
     if (!unitFocused.current)      setUnitInput(toLocalStr(sku.unit_price_usd, rate));
@@ -122,13 +139,15 @@ function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onDragStart
   const dropProps = { onDragOver, onDrop };
 
   const cell = {
-    padding: '11px 4px',
+    padding: `12px ${CELL_PX}px`,
     borderBottom: '1px solid var(--border-dim)',
     display: 'flex',
     alignItems: 'center',
     opacity: isDragging ? 0.35 : 1,
-    transition: 'opacity 0.15s',
+    transition: 'opacity 0.15s, background-color 0.1s',
   };
+  // Fixed-width symbol slot so numeric inputs line up across all money columns
+  const sym = { fontFamily: 'var(--font-ui)', fontSize: '0.78rem', color: 'var(--text-muted)', flexShrink: 0, width: 14, textAlign: 'right' };
 
   return (
     <>
@@ -196,10 +215,11 @@ function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onDragStart
       </div>
 
       {/* Col 3: Unit Cost (editable) */}
-      <div {...dropProps} style={{ ...cell, justifyContent: 'flex-end', gap: 5 }}>
-        <span style={{ fontFamily: 'var(--font-ui)', fontSize: '0.82rem', color: 'var(--text-muted)', flexShrink: 0 }}>{symbol}</span>
+      <div {...dropProps} style={{ ...cell, justifyContent: 'flex-end', gap: 4 }}>
+        <span style={sym}>{symbol}</span>
         <GhostInput
           value={unitInput}
+          listId={`${listPrefix}-unit`}
           onChange={e => setUnitInput(e.target.value)}
           onFocus={() => { unitFocused.current = true; }}
           onBlur={e => {
@@ -210,10 +230,11 @@ function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onDragStart
       </div>
 
       {/* Col 4: Sell Price (editable) */}
-      <div {...dropProps} style={{ ...cell, justifyContent: 'flex-end', gap: 5 }}>
-        <span style={{ fontFamily: 'var(--font-ui)', fontSize: '0.82rem', color: 'var(--gold)', flexShrink: 0 }}>{symbol}</span>
+      <div {...dropProps} style={{ ...cell, justifyContent: 'flex-end', gap: 4 }}>
+        <span style={{ ...sym, color: 'var(--gold)' }}>{symbol}</span>
         <GhostInput
           value={sellInput}
+          listId={`${listPrefix}-sell`}
           onChange={e => setSellInput(e.target.value)}
           onFocus={() => { sellFocused.current = true; }}
           onBlur={e => {
@@ -226,17 +247,18 @@ function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onDragStart
 
       {/* Col 5: Txn Fee (auto) */}
       <div {...dropProps} style={{ ...cell, justifyContent: 'flex-end', gap: 4 }}>
-        <span style={{ fontFamily: 'var(--font-ui)', fontSize: '0.75rem', color: 'var(--text-muted)', opacity: 0.7, flexShrink: 0 }}>{symbol}</span>
+        <span style={sym}>{symbol}</span>
         <span style={{ fontFamily: 'var(--font-ui)', fontSize: '0.82rem', fontVariantNumeric: 'tabular-nums', color: 'var(--text-muted)' }}>
           {Math.abs(Math.round(feeUsd * rate)).toLocaleString('en-US')}
         </span>
       </div>
 
       {/* Col 6: Shipping (editable) */}
-      <div {...dropProps} style={{ ...cell, justifyContent: 'flex-end', gap: 5 }}>
-        <span style={{ fontFamily: 'var(--font-ui)', fontSize: '0.82rem', color: 'var(--text-muted)', flexShrink: 0 }}>{symbol}</span>
+      <div {...dropProps} style={{ ...cell, justifyContent: 'flex-end', gap: 4 }}>
+        <span style={sym}>{symbol}</span>
         <GhostInput
           value={shipInput}
+          listId={`${listPrefix}-ship`}
           onChange={e => setShipInput(e.target.value)}
           onFocus={() => { shipFocused.current = true; }}
           onBlur={e => {
@@ -247,10 +269,11 @@ function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onDragStart
       </div>
 
       {/* Col 7: Other (editable) */}
-      <div {...dropProps} style={{ ...cell, justifyContent: 'flex-end', gap: 5 }}>
-        <span style={{ fontFamily: 'var(--font-ui)', fontSize: '0.82rem', color: 'var(--text-muted)', flexShrink: 0 }}>{symbol}</span>
+      <div {...dropProps} style={{ ...cell, justifyContent: 'flex-end', gap: 4 }}>
+        <span style={sym}>{symbol}</span>
         <GhostInput
           value={otherInput}
+          listId={`${listPrefix}-other`}
           onChange={e => setOtherInput(e.target.value)}
           onFocus={() => { otherFocused.current = true; }}
           onBlur={e => {
@@ -261,10 +284,11 @@ function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onDragStart
       </div>
 
       {/* Col 7b: Marketing (editable) */}
-      <div {...dropProps} style={{ ...cell, justifyContent: 'flex-end', gap: 5 }}>
-        <span style={{ fontFamily: 'var(--font-ui)', fontSize: '0.82rem', color: 'var(--text-muted)', flexShrink: 0 }}>{symbol}</span>
+      <div {...dropProps} style={{ ...cell, justifyContent: 'flex-end', gap: 4 }}>
+        <span style={sym}>{symbol}</span>
         <GhostInput
           value={marketingInput}
+          listId={`${listPrefix}-mkt`}
           onChange={e => setMarketingInput(e.target.value)}
           onFocus={() => { marketingFocused.current = true; }}
           onBlur={e => {
@@ -275,10 +299,11 @@ function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onDragStart
       </div>
 
       {/* Col 7c: Packaging (editable) */}
-      <div {...dropProps} style={{ ...cell, justifyContent: 'flex-end', gap: 5 }}>
-        <span style={{ fontFamily: 'var(--font-ui)', fontSize: '0.82rem', color: 'var(--text-muted)', flexShrink: 0 }}>{symbol}</span>
+      <div {...dropProps} style={{ ...cell, justifyContent: 'flex-end', gap: 4 }}>
+        <span style={sym}>{symbol}</span>
         <GhostInput
           value={packagingInput}
+          listId={`${listPrefix}-pkg`}
           onChange={e => setPackagingInput(e.target.value)}
           onFocus={() => { packagingFocused.current = true; }}
           onBlur={e => {
@@ -288,11 +313,17 @@ function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onDragStart
         />
       </div>
 
+      {/* Datalists for suggestive fill */}
+      <datalist id={`${listPrefix}-unit`}>{unitSuggestions.map(v => <option key={v} value={v} />)}</datalist>
+      <datalist id={`${listPrefix}-sell`}>{sellSuggestions.map(v => <option key={v} value={v} />)}</datalist>
+      <datalist id={`${listPrefix}-ship`}>{shipSuggestions.map(v => <option key={v} value={v} />)}</datalist>
+      <datalist id={`${listPrefix}-other`}>{otherSuggestions.map(v => <option key={v} value={v} />)}</datalist>
+      <datalist id={`${listPrefix}-mkt`}>{mktSuggestions.map(v => <option key={v} value={v} />)}</datalist>
+      <datalist id={`${listPrefix}-pkg`}>{pkgSuggestions.map(v => <option key={v} value={v} />)}</datalist>
+
       {/* Col 8: Profit/unit */}
       <div {...dropProps} style={{ ...cell, justifyContent: 'flex-end', gap: 4 }}>
-        <span style={{ fontFamily: 'var(--font-ui)', fontSize: '0.75rem', fontWeight: 600, color: pc, flexShrink: 0 }}>
-          {profitUsd < 0 ? '-' : ''}{symbol}
-        </span>
+        <span style={{ ...sym, color: pc }}>{profitUsd < 0 ? '-' : ''}{symbol}</span>
         <span style={{ fontFamily: 'var(--font-ui)', fontSize: '0.82rem', fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: pc }}>
           {Math.abs(Math.round(profitUsd * rate)).toLocaleString('en-US')}
         </span>
@@ -306,10 +337,8 @@ function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onDragStart
       </div>
 
       {/* Col 10: Total Profit */}
-      <div {...dropProps} style={{ ...cell, justifyContent: 'flex-end', paddingRight: 0, gap: 4 }}>
-        <span style={{ fontFamily: 'var(--font-ui)', fontSize: '0.75rem', fontWeight: 700, color: pc, flexShrink: 0 }}>
-          {totalProfitUsd < 0 ? '-' : ''}{symbol}
-        </span>
+      <div {...dropProps} style={{ ...cell, justifyContent: 'flex-end', paddingRight: CELL_PX, gap: 4 }}>
+        <span style={{ ...sym, fontWeight: 700, color: pc }}>{totalProfitUsd < 0 ? '-' : ''}{symbol}</span>
         <span style={{ fontFamily: 'var(--font-ui)', fontSize: '0.88rem', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: pc }}>
           {Math.abs(Math.round(totalProfitUsd * rate)).toLocaleString('en-US')}
         </span>
@@ -515,11 +544,9 @@ export default function ProfitCalculator({ categories }) {
 
               {/* Column headers */}
               {HDR_COLS.map((h, i) => (
-                <div key={h} style={{
+                <div key={i} style={{
                   ...colHdr,
-                  padding: '0 4px 10px',
-                  paddingLeft: i === 0 ? 0 : '4px',
-                  paddingRight: i === HDR_COLS.length - 1 ? 0 : '4px',
+                  padding: `0 ${CELL_PX}px 10px`,
                   textAlign: i > 1 ? 'right' : 'left',
                   borderBottom: '1px solid var(--border-med)',
                 }}>
@@ -543,6 +570,7 @@ export default function ProfitCalculator({ categories }) {
                         txnPct={txnPct}
                         txnFixed={txnFixed}
                         onSave={load}
+                        allSkus={skus}
                         isDragging={draggingId === sku.id}
                         onDragStart={() => { dragId.current = sku.id; dragOverId.current = null; setDraggingId(sku.id); }}
                         onDragOver={e => {

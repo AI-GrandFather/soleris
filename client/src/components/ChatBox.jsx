@@ -1,6 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 
-export default function ChatBox({ onDataChanged }) {
+const VIEW_LABELS = {
+  dashboard: 'Budget Planner',
+  profit: 'Profit Calculator',
+};
+
+export default function ChatBox({ onDataChanged, activeView = 'dashboard' }) {
   const [open, setOpen]       = useState(false);
   const [messages, setMessages] = useState([]); // [{role, content}]
   const [input, setInput]     = useState('');
@@ -34,7 +39,7 @@ export default function ChatBox({ onDataChanged }) {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: historyRef.current }),
+        body: JSON.stringify({ messages: historyRef.current, activeView }),
       });
 
       if (!res.ok) {
@@ -157,7 +162,7 @@ export default function ChatBox({ onDataChanged }) {
                   Soleris AI
                 </div>
                 <div style={{ ...mono, fontSize: '0.58rem', color: 'var(--text-muted)', letterSpacing: '0.1em', marginTop: 1 }}>
-                  GPT-5-MINI
+                  {VIEW_LABELS[activeView] ?? 'DASHBOARD'}
                 </div>
               </div>
             </div>

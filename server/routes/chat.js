@@ -16,12 +16,23 @@ const WRITING_TOOLS = new Set([
   'add_expense',
 ]);
 
-function buildSystemPrompt() {
+const VIEW_SECTION_LABELS = {
+  dashboard: 'Budget Planner (categories, expenses, master budget)',
+  profit: 'Profit Calculator (SKU cost fields: unit price, sell price, shipping, marketing, packaging)',
+};
+
+function buildSystemPrompt(activeView = 'dashboard') {
   const pkrRate = db.prepare("SELECT rate FROM exchange_rates WHERE currency = 'PKR'").get()?.rate || 278.5;
+  const sectionLabel = VIEW_SECTION_LABELS[activeView] ?? VIEW_SECTION_LABELS.dashboard;
 
   return `You are the Soleris Ledger AI assistant for a business budgeting dashboard.
 
 Your job is to help users understand their dashboard and make safe changes to the underlying data.
+
+Active section: ${sectionLabel}
+When the user's request is ambiguous about which section they mean, default to the active section above.
+- Budget Planner requests → use category, expense, and budget tools.
+- Profit Calculator requests → use SKU cost and pricing tools.
 
 Rules:
 - When a user wants a change, make the change with tools when the request is specific enough.
@@ -34,16 +45,16 @@ Rules:
 - Confirm completed changes clearly and concisely.
 
 The dashboard tracks:
-- Budget categories and a master total budget
-- Expenses
-- Inventory SKUs with cost, selling price, shipping, and other unit costs
+- Budget categories and a master total budget (Budget Planner)
+- Expenses per category (Budget Planner)
+- Inventory SKUs with unit cost, selling price, shipping, marketing, packaging costs (Profit Calculator)
 
 Today's date: ${new Date().toISOString().slice(0, 10)}`;
 }
 
 let cachedClient = null;
 const RESPONSE_OPTIONS = {
-  reasoning: { effort: 'low' },
+  reasoning: { effort: 'medium' },
 };
 
 function getModel() {
@@ -525,16 +536,17 @@ router.post('/', async (req, res) => {
   }
 
   try {
-    const { messages } = req.body;
+    const { messages, activeView } = req.body;
     if (!Array.isArray(messages)) {
       return res.status(400).json({ error: 'messages array required' });
     }
 
+    const systemPrompt = buildSystemPrompt(activeView);
     let changed = false;
     let response = await client.responses.create({
       ...RESPONSE_OPTIONS,
       model: getModel(),
-      instructions: buildSystemPrompt(),
+      instructions: systemPrompt,
       input: toResponseInput(messages),
       tools,
       tool_choice: 'auto',
@@ -576,7 +588,7 @@ router.post('/', async (req, res) => {
         model: getModel(),
         previous_response_id: response.id,
         input: toolOutputs,
-        instructions: buildSystemPrompt(),
+        instructions: systemPrompt,
         tools,
         tool_choice: 'auto',
       });
