@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useCurrency } from '../contexts/CurrencyContext.jsx';
 
-// 13 columns — drag handle, image, SKU name, then data columns
-const GRID = '20px 34px minmax(110px,1.2fr) 60px 90px 90px 82px 82px 74px 74px 86px 56px 96px';
+// 14 columns — drag handle, image, SKU name, then data columns
+const GRID = '20px 56px minmax(110px,1.2fr) 60px 90px 90px 82px 82px 74px 74px 82px 86px 56px 96px';
 
 function toLocalStr(usd, rate) {
   const v = usd * rate;
@@ -61,12 +61,14 @@ function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onDragStart
   const [qtyInput,  setQtyInput]  = useState(String(sku.quantity));
   const [otherInput,setOtherInput]= useState(() => toLocalStr(sku.other_costs_usd, rate));
   const [marketingInput, setMarketingInput] = useState(() => toLocalStr(sku.marketing_cost_usd, rate));
+  const [packagingInput, setPackagingInput] = useState(() => toLocalStr(sku.packaging_cost_usd || 0, rate));
 
   const unitFocused      = useRef(false);
   const sellFocused      = useRef(false);
   const shipFocused      = useRef(false);
   const otherFocused     = useRef(false);
   const marketingFocused = useRef(false);
+  const packagingFocused = useRef(false);
 
   useEffect(() => {
     if (!unitFocused.current)      setUnitInput(toLocalStr(sku.unit_price_usd, rate));
@@ -74,7 +76,8 @@ function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onDragStart
     if (!shipFocused.current)      setShipInput(toLocalStr(sku.shipping_cost_usd, rate));
     if (!otherFocused.current)     setOtherInput(toLocalStr(sku.other_costs_usd, rate));
     if (!marketingFocused.current) setMarketingInput(toLocalStr(sku.marketing_cost_usd, rate));
-  }, [rate, sku.unit_price_usd, sku.selling_price_usd, sku.shipping_cost_usd, sku.other_costs_usd, sku.marketing_cost_usd]);
+    if (!packagingFocused.current) setPackagingInput(toLocalStr(sku.packaging_cost_usd || 0, rate));
+  }, [rate, sku.unit_price_usd, sku.selling_price_usd, sku.shipping_cost_usd, sku.other_costs_usd, sku.marketing_cost_usd, sku.packaging_cost_usd]);
 
   useEffect(() => {
     setNameInput(sku.name);
@@ -86,10 +89,11 @@ function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onDragStart
   const shippingUsd  = (parseFloat(shipInput)      || 0) / rate;
   const otherUsd     = (parseFloat(otherInput)     || 0) / rate;
   const marketingUsd = (parseFloat(marketingInput) || 0) / rate;
+  const packagingUsd = (parseFloat(packagingInput) || 0) / rate;
   const qty          = parseFloat(qtyInput) || sku.quantity;
 
   const feeUsd         = sellingUsd * txnPct + txnFixed;
-  const totalCostUsd   = unitUsd + feeUsd + shippingUsd + otherUsd + marketingUsd;
+  const totalCostUsd   = unitUsd + feeUsd + shippingUsd + otherUsd + marketingUsd + packagingUsd;
   const profitUsd      = sellingUsd - totalCostUsd;
   const margin         = sellingUsd > 0 ? (profitUsd / sellingUsd) * 100 : 0;
   const totalProfitUsd = profitUsd * qty;
@@ -107,6 +111,7 @@ function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onDragStart
         shipping_cost_usd: shippingUsd,
         other_costs_usd: otherUsd,
         marketing_cost_usd: marketingUsd,
+        packaging_cost_usd: packagingUsd,
         ...overrides,
       }),
     });
@@ -143,7 +148,7 @@ function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onDragStart
       {/* Col 1: image thumbnail */}
       <div {...dropProps} style={{ ...cell, paddingLeft: 0, paddingRight: 0 }}>
         {sku.image_data
-          ? <img src={sku.image_data} alt="" style={{ width: 30, height: 30, objectFit: 'cover', borderRadius: 3, border: '1px solid var(--border-dim)' }} />
+          ? <img src={sku.image_data} alt="" style={{ width: 54, height: 54, objectFit: 'cover', borderRadius: 3, border: '1px solid var(--border-dim)' }} />
           : <div style={{ width: 30, height: 30, borderRadius: 3, border: '1px dashed var(--border-dim)', background: 'var(--bg-elevated)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
             </div>
@@ -269,6 +274,20 @@ function SkuProfitRow({ sku, rate, symbol, txnPct, txnFixed, onSave, onDragStart
         />
       </div>
 
+      {/* Col 7c: Packaging (editable) */}
+      <div {...dropProps} style={{ ...cell, justifyContent: 'flex-end', gap: 5 }}>
+        <span style={{ fontFamily: 'var(--font-ui)', fontSize: '0.82rem', color: 'var(--text-muted)', flexShrink: 0 }}>{symbol}</span>
+        <GhostInput
+          value={packagingInput}
+          onChange={e => setPackagingInput(e.target.value)}
+          onFocus={() => { packagingFocused.current = true; }}
+          onBlur={e => {
+            packagingFocused.current = false;
+            save({ packaging_cost_usd: (parseFloat(e.target.value) || 0) / rate });
+          }}
+        />
+      </div>
+
       {/* Col 8: Profit/unit */}
       <div {...dropProps} style={{ ...cell, justifyContent: 'flex-end', gap: 4 }}>
         <span style={{ fontFamily: 'var(--font-ui)', fontSize: '0.75rem', fontWeight: 600, color: pc, flexShrink: 0 }}>
@@ -319,7 +338,7 @@ function CategoryHeader({ cat }) {
   );
 }
 
-const HDR_COLS = ['', '', 'SKU', 'Qty', 'Unit Cost', 'Sell Price', 'Txn Fee', 'Shipping', 'Other', 'Marketing', 'Profit/Unit', 'Margin', 'Total Profit'];
+const HDR_COLS = ['', '', 'SKU', 'Qty', 'Unit Cost', 'Sell Price', 'Txn Fee', 'Shipping', 'Other', 'Marketing', 'Packaging', 'Profit/Unit', 'Margin', 'Total Profit'];
 
 export default function ProfitCalculator({ categories }) {
   const { rates, currency, symbol } = useCurrency();
@@ -366,7 +385,7 @@ export default function ProfitCalculator({ categories }) {
 
   const totals = skus.reduce((acc, sku) => {
     const fee    = sku.selling_price_usd * txnPct + txnFixed;
-    const cost   = sku.unit_price_usd + fee + sku.shipping_cost_usd + sku.other_costs_usd + (sku.marketing_cost_usd || 0);
+    const cost   = sku.unit_price_usd + fee + sku.shipping_cost_usd + sku.other_costs_usd + (sku.marketing_cost_usd || 0) + (sku.packaging_cost_usd || 0);
     const profit = sku.selling_price_usd - cost;
     acc.revenue += sku.selling_price_usd * sku.quantity;
     acc.cost    += cost    * sku.quantity;

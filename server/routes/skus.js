@@ -46,9 +46,9 @@ router.put('/:id', (req, res) => {
   const id = parseInt(req.params.id);
   const existing = db.prepare('SELECT * FROM skus WHERE id = ?').get(id);
   if (!existing) return res.status(404).json({ error: 'SKU not found' });
-  const { name, unit_price_usd, quantity, note, selling_price_usd, shipping_cost_usd, other_costs_usd, marketing_cost_usd, image_data } = req.body;
+  const { name, unit_price_usd, quantity, note, selling_price_usd, shipping_cost_usd, other_costs_usd, marketing_cost_usd, packaging_cost_usd, image_data } = req.body;
   db.prepare(
-    'UPDATE skus SET name = ?, unit_price_usd = ?, quantity = ?, note = ?, selling_price_usd = ?, shipping_cost_usd = ?, other_costs_usd = ?, marketing_cost_usd = ?, image_data = ? WHERE id = ?'
+    'UPDATE skus SET name = ?, unit_price_usd = ?, quantity = ?, note = ?, selling_price_usd = ?, shipping_cost_usd = ?, other_costs_usd = ?, marketing_cost_usd = ?, packaging_cost_usd = ?, image_data = ? WHERE id = ?'
   ).run(
     name ?? existing.name,
     unit_price_usd ?? existing.unit_price_usd,
@@ -58,6 +58,7 @@ router.put('/:id', (req, res) => {
     shipping_cost_usd ?? existing.shipping_cost_usd,
     other_costs_usd ?? existing.other_costs_usd,
     marketing_cost_usd ?? existing.marketing_cost_usd,
+    packaging_cost_usd ?? existing.packaging_cost_usd,
     'image_data' in req.body ? (image_data ?? null) : existing.image_data,
     id
   );

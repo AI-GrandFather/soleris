@@ -73,6 +73,7 @@ try {
 });
 
 try { db.exec('ALTER TABLE skus ADD COLUMN marketing_cost_usd REAL NOT NULL DEFAULT 0'); } catch { /* exists */ }
+try { db.exec('ALTER TABLE skus ADD COLUMN packaging_cost_usd REAL NOT NULL DEFAULT 0'); } catch { /* exists */ }
 try { db.exec('ALTER TABLE skus ADD COLUMN image_data TEXT'); } catch { /* exists */ }
 
 try { db.exec('ALTER TABLE categories ADD COLUMN budget_pkr REAL NOT NULL DEFAULT 0'); } catch { /* exists */ }
