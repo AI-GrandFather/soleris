@@ -8,7 +8,8 @@ const DATA_DIR = join(__dirname, '../data');
 
 mkdirSync(DATA_DIR, { recursive: true });
 
-const db = new Database(join(DATA_DIR, 'budget.db'));
+const DB_PATH = process.env.DATABASE_PATH || join(DATA_DIR, 'budget.db');
+const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
